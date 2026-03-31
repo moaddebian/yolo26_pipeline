@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOLO26 NMS-Free — Architecture d'Entraînement en Détail</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17;
+  --bg2: #0f1423;
+  --bg3: #141a2e;
+  --bg4: #1a2240;
+  --cyan: #00d4ff;
+  --orange: #ff6b35;
+  --green: #00ff88;
+  --purple: #a855f7;
+  --red: #ff4466;
+  --yellow: #ffd700;
+  --text: #e0e6f0;
+  --text2: #8892a8;
+  --text3: #4a5568;
+  --border: #1e2a45;
+  --glow-cyan: 0 0 20px rgba(0,212,255,0.3);
+  --glow-orange: 0 0 20px rgba(255,107,53,0.3);
+  --glow-green: 0 0 20px rgba(0,255,136,0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+.noise-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9999;
+}
+
+header {
+  padding: 2.5rem 2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0,212,255,0.04) 0%, transparent 100%);
+  position: relative;
+}
+
+header::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--orange), var(--green), transparent);
+}
+
+.header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+  opacity: 0.8;
+}
+
+h1 {
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--cyan), #fff, var(--orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.3;
+}
+
+.header-sub {
+  font-size: 0.85rem;
+  color: var(--text2);
+  margin-top: 0.4rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+nav {
+  display: flex;
+  gap: 0;
+  padding: 0 1rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg4) transparent;
+}
+
+nav button {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: color 0.3s, background 0.3s;
+  letter-spacing: 0.5px;
+}
+
+nav button:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+nav button.active {
+  color: var(--cyan);
+  background: rgba(0,212,255,0.06);
+}
+
+nav button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.tab-index {
+  display: inline-block;
+  width: 18px; height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  font-size: 0.6rem;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+nav button.active .tab-index {
+  background: rgba(0,212,255,0.2);
+  color: var(--cyan);
+}
+
+main {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.panel {
+  display: none;
+  animation: panelIn 0.5s ease;
+}
+
+.panel.active { display: block; }
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.section-title .dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.section-desc {
+  color: var(--text2);
+  font-size: 0.85rem;
+  margin-bottom: 2rem;
+  max-width: 700px;
+  line-height: 1.6;
+}
+
+/* ── SVG Diagram Containers ── */
+.diagram-container {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.diagram-container::before {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at 30% 20%, rgba(0,212,255,0.03), transparent 60%);
+  pointer-events: none;
+}
+
+.diagram-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text3);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+}
+
+/* ── Architecture SVG ── */
+svg text { font-family: 'Space Grotesk', sans-serif; }
+svg .mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ── ProgLoss Chart ── */
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 400px;
+}
+
+canvas#progChart { width: 100%; height: 100%; }
+
+.formula-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.4rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  line-height: 1.8;
+  margin-top: 1.2rem;
+  color: var(--text2);
+}
+
+.formula-box .hl-cyan { color: var(--cyan); }
+.formula-box .hl-orange { color: var(--orange); }
+.formula-box .hl-green { color: var(--green); }
+
+/* ── Tables ── */
+.comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.comp-table th {
+  background: var(--bg4);
+  color: var(--cyan);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 0.8rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid var(--cyan);
+}
+
+.comp-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.comp-table tr:hover td { background: rgba(0,212,255,0.03); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.badge-cyan { background: rgba(0,212,255,0.15); color: var(--cyan); }
+.badge-orange { background: rgba(255,107,53,0.15); color: var(--orange); }
+.badge-green { background: rgba(0,255,136,0.15); color: var(--green); }
+.badge-red { background: rgba(255,68,102,0.15); color: var(--red); }
+.badge-purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+
+/* ── Dependency Graph ── */
+.dep-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+  transition: border-color 0.3s;
+}
+
+.dep-card:hover { border-color: var(--cyan); }
+
+.dep-card .dep-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.dep-card .dep-why {
+  color: var(--text2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.dep-card .dep-without {
+  color: var(--red);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.dep-header {
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr;
+  gap: 1rem;
+  padding: 0.8rem 1.2rem;
+  background: var(--bg4);
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+
+.legend-dot {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+}
+
+/* ── Mode Toggle ── */
+.mode-toggle {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.mode-toggle button {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.mode-toggle button.active {
+  background: rgba(0,212,255,0.12);
+  color: var(--cyan);
+}
+
+/* ── Animated reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Code flow ── */
+.code-flow-step {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+.code-flow-line {
+  width: 3px;
+  background: var(--border);
+  margin-left: 20px;
+  position: relative;
+}
+
+.code-flow-line::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -6px;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--cyan);
+}
+
+.code-flow-content {
+  margin-left: 1.5rem;
+  padding: 1rem 0 1.5rem;
+  flex: 1;
+}
+
+.code-flow-fn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--cyan);
+  margin-bottom: 0.3rem;
+}
+
+.code-flow-desc {
+  font-size: 0.8rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.code-flow-code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin-top: 0.6rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.7;
+  color: var(--text2);
+  overflow-x: auto;
+}
+
+.code-flow-code .kw { color: var(--purple); }
+.code-flow-code .fn { color: var(--cyan); }
+.code-flow-code .cm { color: var(--text3); }
+.code-flow-code .str { color: var(--green); }
+.code-flow-code .num { color: var(--orange); }
+
+/* ── STAL diagram ── */
+.stal-grid {
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.stal-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.stal-arrow {
+  text-align: center;
+  font-size: 2rem;
+  color: var(--green);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  main { padding: 1rem; }
+  .dep-card { grid-template-columns: 1fr; }
+  .dep-header { grid-template-columns: 1fr; }
+  .stal-grid { grid-template-columns: 1fr; }
+  .stal-arrow { transform: rotate(90deg); }
+  nav { padding: 0 0.5rem; }
+  nav button { padding: 0.7rem 0.8rem; font-size: 0.65rem; }
+}
+
+/* ── TAL Visualization ── */
+.tal-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 800px) {
+  .tal-container { grid-template-columns: 1fr; }
+}
+
+.tal-panel {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.tal-panel h3 {
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+}
+
+.tal-panel .tal-sub {
+  font-size: 0.75rem;
+  color: var(--text2);
+  margin-bottom: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Animation keyframes */
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+  50% { box-shadow: 0 0 20px 4px rgba(0,212,255,0.15); }
+}
+
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,53,0.4); }
+  50% { box-shadow: 0 0 20px 4px rgba(255,107,53,0.15); }
+}
+
+@keyframes flow-dash {
+  to { stroke-dashoffset: -20; }
+}
+
+.flow-animated {
+  stroke-dasharray: 8 6;
+  animation: flow-dash 1s linear infinite;
+}
+
+@keyframes fadeInUp {
+  from { opacity:0; transform: translateY(12px); }
+  to { opacity:1; transform: translateY(0); }
+}
+
+.anim-delay-1 { animation: fadeInUp 0.5s 0.1s both; }
+.anim-delay-2 { animation: fadeInUp 0.5s 0.2s both; }
+.anim-delay-3 { animation: fadeInUp 0.5s 0.3s both; }
+.anim-delay-4 { animation: fadeInUp 0.5s 0.4s both; }
+.anim-delay-5 { animation: fadeInUp 0.5s 0.5s both; }
+.anim-delay-6 { animation: fadeInUp 0.5s 0.6s both; }
+.anim-delay-7 { animation: fadeInUp 0.5s 0.7s both; }
+
+.footnote {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+}
+</style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+
+<header>
+  <div class="header-label">Stage#02-2026 · Caplogy Innovation · Recherche</div>
+  <h1>YOLO26 NMS-Free — Architecture d'Entraînement en Détail</h1>
+  <div class="header-sub">Pipeline End-to-End sans Post-Traitement · Double Assignation · ProgLoss · STAL</div>
+</header>
+
+<nav id="tabs">
+  <button class="active" data-tab="arch"><span class="tab-index">1</span>Architecture</button>
+  <button data-tab="prog"><span class="tab-index">2</span>ProgLoss</button>
+  <button data-tab="tal"><span class="tab-index">3</span>TAL</button>
+  <button data-tab="stal"><span class="tab-index">4</span>STAL</button>
+  <button data-tab="comp"><span class="tab-index">5</span>Comparaison</button>
+  <button data-tab="deps"><span class="tab-index">6</span>Dépendances</button>
+  <button data-tab="flow"><span class="tab-index">7</span>Flux du Code</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 1: ARCHITECTURE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel active" id="panel-arch">
+  <div class="section-title"><span class="dot" style="background:var(--cyan)"></span> Architecture Double Tête</div>
+  <div class="section-desc">
+    YOLO26 conserve l'architecture duale de YOLOv10 : un backbone et un neck partagés alimentent deux têtes parallèles — O2M (one-to-many) et O2O (one-to-one). Les caractéristiques sont <em>détachées</em> (stop-gradient) avant la tête O2O.
+  </div>
+
+  <div class="mode-toggle">
+    <button class="active" onclick="setArchMode('train')">Entraînement</button>
+    <button onclick="setArchMode('infer')">Inférence</button>
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Flux de données — <span id="arch-mode-label">mode entraînement</span></div>
+    <svg id="arch-svg" viewBox="0 0 1100 520" width="100%" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow-cyan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#00d4ff"/>
+        </marker>
+        <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#ff6b35"/>
+        </marker>
+        <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#00ff88"/>
+        </marker>
+        <marker id="arrow-white" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#e0e6f0"/>
+        </marker>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <linearGradient id="grad-cyan" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="grad-orange" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ff6b35" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#ff6b35" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Image Input -->
+      <rect x="20" y="210" width="110" height="80" rx="8" fill="#141a2e" stroke="#4a5568" stroke-width="1.5" class="anim-delay-1"/>
+      <text x="75" y="245" text-anchor="middle" fill="#e0e6f0" font-size="13" font-weight="600">Image</text>
+      <text x="75" y="268" text-anchor="middle" fill="#8892a8" font-size="10" class="mono">640×640×3</text>
+
+      <!-- Backbone -->
+      <rect x="180" y="195" width="140" height="110" rx="10" fill="#141a2e" stroke="#a855f7" stroke-width="1.5" class="anim-delay-2"/>
+      <text x="250" y="237" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="600" class="mono">BACKBONE</text>
+      <text x="250" y="257" text-anchor="middle" fill="#8892a8" font-size="10">Extraction de</text>
+      <text x="250" y="273" text-anchor="middle" fill="#8892a8" font-size="10">caractéristiques</text>
+      <text x="250" y="293" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">C2f / RepVGG</text>
+
+      <!-- Neck -->
+      <rect x="370" y="195" width="140" height="110" rx="10" fill="#141a2e" stroke="#ffd700" stroke-width="1.5" class="anim-delay-3"/>
+      <text x="440" y="237" text-anchor="middle" fill="#ffd700" font-size="11" font-weight="600" class="mono">NECK (FPN)</text>
+      <text x="440" y="257" text-anchor="middle" fill="#8892a8" font-size="10">Fusion multi-échelle</text>
+      <text x="440" y="273" text-anchor="middle" fill="#8892a8" font-size="10">P3, P4, P5</text>
+      <text x="440" y="293" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">stride 8, 16, 32</text>
+
+      <!-- Feature split point -->
+      <circle cx="560" cy="250" r="6" fill="#00ff88" filter="url(#glow)" class="anim-delay-4"/>
+
+      <!-- Detach label -->
+      <g id="detach-label" class="anim-delay-4">
+        <rect x="548" y="152" width="100" height="32" rx="6" fill="rgba(0,255,136,0.1)" stroke="#00ff88" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="598" y="172" text-anchor="middle" fill="#00ff88" font-size="9" font-weight="600" class="mono">detach()</text>
+      </g>
+
+      <!-- O2M Head -->
+      <g id="o2m-group" class="anim-delay-5">
+        <rect x="640" y="70" width="200" height="130" rx="10" fill="url(#grad-orange)" stroke="#ff6b35" stroke-width="1.5"/>
+        <text x="740" y="102" text-anchor="middle" fill="#ff6b35" font-size="13" font-weight="700">Tête O2M</text>
+        <text x="740" y="122" text-anchor="middle" fill="#ff6b35" font-size="10" class="mono">one-to-many</text>
+        <text x="740" y="148" text-anchor="middle" fill="#8892a8" font-size="10">Plusieurs ancres / objet</text>
+        <text x="740" y="166" text-anchor="middle" fill="#8892a8" font-size="10">TAL topk=10</text>
+        <text x="740" y="186" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">cls_head + bbox_head</text>
+      </g>
+
+      <!-- O2O Head -->
+      <g id="o2o-group" class="anim-delay-5">
+        <rect x="640" y="310" width="200" height="130" rx="10" fill="url(#grad-cyan)" stroke="#00d4ff" stroke-width="1.5"/>
+        <text x="740" y="342" text-anchor="middle" fill="#00d4ff" font-size="13" font-weight="700">Tête O2O</text>
+        <text x="740" y="362" text-anchor="middle" fill="#00d4ff" font-size="10" class="mono">one-to-one</text>
+        <text x="740" y="388" text-anchor="middle" fill="#8892a8" font-size="10">Une seule ancre / objet</text>
+        <text x="740" y="406" text-anchor="middle" fill="#8892a8" font-size="10">TAL topk=7 → topk2=1</text>
+        <text x="740" y="426" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">cls_head + bbox_head</text>
+      </g>
+
+      <!-- Loss boxes -->
+      <g id="loss-o2m" class="anim-delay-6">
+        <rect x="900" y="100" width="120" height="60" rx="8" fill="#141a2e" stroke="#ff6b35" stroke-width="1" stroke-dasharray="5 3"/>
+        <text x="960" y="127" text-anchor="middle" fill="#ff6b35" font-size="11" font-weight="600" class="mono">L_o2m</text>
+        <text x="960" y="147" text-anchor="middle" fill="#8892a8" font-size="9">BCE + CIoU</text>
+      </g>
+
+      <g id="loss-o2o" class="anim-delay-6">
+        <rect x="900" y="340" width="120" height="60" rx="8" fill="#141a2e" stroke="#00d4ff" stroke-width="1" stroke-dasharray="5 3"/>
+        <text x="960" y="367" text-anchor="middle" fill="#00d4ff" font-size="11" font-weight="600" class="mono">L_o2o</text>
+        <text x="960" y="387" text-anchor="middle" fill="#8892a8" font-size="9">BCE + CIoU</text>
+      </g>
+
+      <!-- ProgLoss combiner -->
+      <g id="progloss-box" class="anim-delay-7">
+        <rect x="920" y="220" width="150" height="60" rx="10" fill="rgba(0,255,136,0.08)" stroke="#00ff88" stroke-width="1.5"/>
+        <text x="995" y="247" text-anchor="middle" fill="#00ff88" font-size="11" font-weight="700" class="mono">ProgLoss</text>
+        <text x="995" y="267" text-anchor="middle" fill="#8892a8" font-size="9">w_o2m·L₁ + w_o2o·L₂</text>
+      </g>
+
+      <!-- Inference output -->
+      <g id="infer-output" style="display:none">
+        <rect x="900" y="335" width="160" height="70" rx="10" fill="rgba(0,255,136,0.08)" stroke="#00ff88" stroke-width="2"/>
+        <text x="980" y="365" text-anchor="middle" fill="#00ff88" font-size="12" font-weight="700">Sortie Finale</text>
+        <text x="980" y="385" text-anchor="middle" fill="#8892a8" font-size="10" class="mono">(N, 300, 6)</text>
+        <text x="980" y="400" text-anchor="middle" fill="#00ff88" font-size="9">SANS NMS</text>
+      </g>
+
+      <!-- Arrows -->
+      <line x1="130" y1="250" x2="175" y2="250" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="320" y1="250" x2="365" y2="250" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="510" y1="250" x2="553" y2="250" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+
+      <!-- Split to O2M (direct) -->
+      <path id="arrow-to-o2m" d="M 560 244 L 560 135 L 636 135" fill="none" stroke="#ff6b35" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+      <!-- Split to O2O (detached) -->
+      <path d="M 560 256 L 560 375 L 636 375" fill="none" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrow-cyan)" class="flow-animated"/>
+
+      <!-- Detach arrow -->
+      <path d="M 598 184 L 598 200 L 570 230" fill="none" stroke="#00ff88" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-green)"/>
+
+      <!-- O2M to loss -->
+      <line id="o2m-to-loss" x1="840" y1="135" x2="896" y2="130" stroke="#ff6b35" stroke-width="1" marker-end="url(#arrow-orange)"/>
+
+      <!-- O2O to loss -->
+      <line id="o2o-to-loss" x1="840" y1="375" x2="896" y2="370" stroke="#00d4ff" stroke-width="1" marker-end="url(#arrow-cyan)"/>
+
+      <!-- Losses to ProgLoss -->
+      <line id="lo2m-to-prog" x1="960" y1="160" x2="980" y2="216" stroke="#ff6b35" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-orange)"/>
+      <line id="lo2o-to-prog" x1="960" y1="340" x2="980" y2="284" stroke="#00d4ff" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-cyan)"/>
+
+      <!-- Training only labels -->
+      <g id="train-only-label">
+        <rect x="645" y="48" width="120" height="20" rx="4" fill="rgba(255,107,53,0.15)"/>
+        <text x="705" y="62" text-anchor="middle" fill="#ff6b35" font-size="9" font-weight="600" class="mono">ENTRAÎN. SEUL.</text>
+      </g>
+
+      <g id="both-label">
+        <rect x="645" y="445" width="145" height="20" rx="4" fill="rgba(0,212,255,0.15)"/>
+        <text x="717" y="459" text-anchor="middle" fill="#00d4ff" font-size="9" font-weight="600" class="mono">ENTRAÎN. + INFÉR.</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> Tête O2M (entraînement uniquement)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> Tête O2O (entraînement + inférence)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> detach() — stop-gradient</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> Backbone partagé</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div> Neck partagé</div>
+  </div>
+
+  <div class="footnote">
+    Sources : Wang et al. (YOLOv10, NeurIPS 2024) [10] · Ultralytics YOLO26 [11] · Chakrabarty [13] · Sapkota et al. [12]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 2: PROGLOSS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-prog">
+  <div class="section-title"><span class="dot" style="background:var(--green)"></span> ProgLoss — Pondération Progressive</div>
+  <div class="section-desc">
+    ProgLoss est un ordonnanceur dynamique qui fait décroître le poids de la tête O2M et croître celui de la tête O2O au fil des époques. En début d'entraînement, le signal O2M (riche, multi-ancres) domine ; en fin, le signal O2O (une ancre par objet) prend le relais.
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Évolution des poids w_o2m et w_o2o sur 500 époques</div>
+    <div class="chart-wrapper">
+      <canvas id="progChart"></canvas>
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--text2);">
+        <span style="display:inline-block;width:30px;height:3px;background:var(--orange);border-radius:2px;"></span>
+        w_o2m (décroissant)
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--text2);">
+        <span style="display:inline-block;width:30px;height:3px;background:var(--cyan);border-radius:2px;"></span>
+        w_o2o (croissant)
+      </div>
+      <div style="margin-left:auto;">
+        <button id="playBtn" onclick="toggleProgAnim()" style="background:rgba(0,255,136,0.1);border:1px solid var(--green);color:var(--green);padding:0.4rem 1rem;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">▶ Animer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="formula-box">
+    <span class="hl-orange">w_o2m(t)</span> = max(1 − t/(epochs−1), 0) × (0.8 − 0.1) + 0.1<br>
+    <span class="hl-cyan">w_o2o(t)</span> = 1.0 − w_o2m(t)<br><br>
+    <span class="hl-green">L_total(t)</span> = <span class="hl-orange">w_o2m(t)</span> × L_o2m + <span class="hl-cyan">w_o2o(t)</span> × L_o2o<br><br>
+    <span style="color:var(--text3)">// Époque 0   : w_o2m=0.80, w_o2o=0.20 — O2M domine (apprentissage supervisé riche)</span><br>
+    <span style="color:var(--text3)">// Époque 250 : w_o2m=0.45, w_o2o=0.55 — Transition progressive</span><br>
+    <span style="color:var(--text3)">// Époque 499 : w_o2m=0.10, w_o2o=0.90 — O2O domine (préparation à l'inférence)</span>
+  </div>
+
+  <div class="footnote">
+    Source : Chakrabarty [13] — "YOLO26: An Analysis of NMS-Free End to End Framework" · Sapkota et al. [12]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 3: TAL -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-tal">
+  <div class="section-title"><span class="dot" style="background:var(--purple)"></span> TaskAlignedAssigner (TAL)</div>
+  <div class="section-desc">
+    Le TAL utilise une métrique d'alignement combinant le score de classification et l'IoU pour sélectionner les ancres positives. Le mode O2M sélectionne les top-10 ancres ; le mode O2O sélectionne d'abord top-7 puis réduit à topk2=1 (la meilleure).
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Métrique d'alignement</div>
+    <div class="formula-box" style="margin-top:0;">
+      <span class="hl-green" style="font-size:1rem;">M = score<sup>α</sup> × IoU<sup>β</sup></span><br><br>
+      avec <span class="hl-cyan">α = 0.5</span> et <span class="hl-orange">β = 6.0</span><br><br>
+      <span style="color:var(--text3)">// β=6.0 ≫ α=0.5 : la localisation est fortement prioritaire sur la classification</span><br>
+      <span style="color:var(--text3)">// Cohérence O2O/O2M : mêmes α, β pour les deux têtes (Consistent Matching)</span>
+    </div>
+  </div>
+
+  <div class="tal-container">
+    <div class="tal-panel" style="border-color:var(--orange);">
+      <h3 style="color:var(--orange);">O2M — One-to-Many</h3>
+      <div class="tal-sub">TAL(topk=10)</div>
+      <svg viewBox="0 0 340 280" width="100%">
+        <!-- Grid -->
+        <rect x="30" y="20" width="280" height="230" rx="6" fill="#0a0e17" stroke="#1e2a45" stroke-width="1"/>
+        <!-- Grid lines -->
+        <line x1="30" y1="76" x2="310" y2="76" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="30" y1="133" x2="310" y2="133" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="30" y1="190" x2="310" y2="190" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="100" y1="20" x2="100" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="170" y1="20" x2="170" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="240" y1="20" x2="240" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+
+        <!-- GT box -->
+        <rect x="95" y="80" width="120" height="95" rx="3" fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="6 3"/>
+        <text x="155" y="137" text-anchor="middle" fill="#00ff88" font-size="9" class="mono">GT box</text>
+
+        <!-- Positive anchors (10) -->
+        <circle cx="110" cy="95" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="145" cy="90" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="180" cy="100" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="120" cy="125" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="155" cy="120" r="7" fill="rgba(255,107,53,0.5)" stroke="#ff6b35" stroke-width="2"/>
+        <circle cx="190" cy="130" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="130" cy="155" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="165" cy="160" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="200" cy="145" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+        <circle cx="145" cy="145" r="6" fill="rgba(255,107,53,0.3)" stroke="#ff6b35" stroke-width="1.5"/>
+
+        <!-- Negative anchors (faded) -->
+        <circle cx="60" cy="50" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="260" cy="45" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="55" cy="200" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="280" cy="210" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="70" cy="130" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="270" cy="120" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+
+        <text x="170" y="270" text-anchor="middle" fill="#ff6b35" font-size="10" font-weight="600">10 ancres positives / objet</text>
+      </svg>
+      <div style="margin-top:0.8rem;font-size:0.78rem;color:var(--text2);line-height:1.6;">
+        <strong style="color:var(--orange)">Signal superviseur riche :</strong> 10 ancres reçoivent un gradient positif par objet, accélérant la convergence du backbone et du neck partagés.
+      </div>
+    </div>
+
+    <div class="tal-panel" style="border-color:var(--cyan);">
+      <h3 style="color:var(--cyan);">O2O — One-to-One</h3>
+      <div class="tal-sub">TAL(topk=7, topk2=1)</div>
+      <svg viewBox="0 0 340 280" width="100%">
+        <!-- Grid -->
+        <rect x="30" y="20" width="280" height="230" rx="6" fill="#0a0e17" stroke="#1e2a45" stroke-width="1"/>
+        <line x1="30" y1="76" x2="310" y2="76" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="30" y1="133" x2="310" y2="133" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="30" y1="190" x2="310" y2="190" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="100" y1="20" x2="100" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="170" y1="20" x2="170" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+        <line x1="240" y1="20" x2="240" y2="250" stroke="#1e2a45" stroke-width="0.5"/>
+
+        <!-- GT box -->
+        <rect x="95" y="80" width="120" height="95" rx="3" fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="6 3"/>
+        <text x="155" y="137" text-anchor="middle" fill="#00ff88" font-size="9" class="mono">GT box</text>
+
+        <!-- Single positive anchor (the best one) -->
+        <circle cx="155" cy="120" r="9" fill="rgba(0,212,255,0.4)" stroke="#00d4ff" stroke-width="2.5">
+          <animate attributeName="r" values="9;12;9" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <text x="155" y="124" text-anchor="middle" fill="#00d4ff" font-size="8" font-weight="700">★</text>
+
+        <!-- Rejected candidates (semi-transparent) -->
+        <circle cx="110" cy="95" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="180" cy="100" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="120" cy="125" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="190" cy="130" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="130" cy="155" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="165" cy="160" r="5" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3 2"/>
+
+        <!-- Negative anchors -->
+        <circle cx="60" cy="50" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="260" cy="45" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="55" cy="200" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+        <circle cx="280" cy="210" r="4" fill="rgba(74,85,104,0.3)" stroke="#4a5568" stroke-width="0.5"/>
+
+        <text x="170" y="270" text-anchor="middle" fill="#00d4ff" font-size="10" font-weight="600">1 seule ancre positive / objet</text>
+      </svg>
+      <div style="margin-top:0.8rem;font-size:0.78rem;color:var(--text2);line-height:1.6;">
+        <strong style="color:var(--cyan)">Sélection unique :</strong> Parmi 7 candidates pré-sélectionnées, seule celle avec le M le plus élevé est retenue (topk2=1). Pas de doublons → pas besoin de NMS.
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram-container" style="margin-top:1.5rem;">
+    <div class="diagram-label">Processus de sélection O2O en détail</div>
+    <svg viewBox="0 0 900 130" width="100%">
+      <rect x="10" y="35" width="160" height="60" rx="8" fill="#141a2e" stroke="#4a5568" stroke-width="1"/>
+      <text x="90" y="60" text-anchor="middle" fill="#e0e6f0" font-size="11" font-weight="600">Toutes les ancres</text>
+      <text x="90" y="78" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">8400 ancres (P3+P4+P5)</text>
+
+      <line x1="170" y1="65" x2="220" y2="65" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <text x="195" y="55" text-anchor="middle" fill="#a855f7" font-size="8" class="mono">filtre</text>
+
+      <rect x="225" y="35" width="160" height="60" rx="8" fill="#141a2e" stroke="#a855f7" stroke-width="1"/>
+      <text x="305" y="58" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="600">Candidats topk=7</text>
+      <text x="305" y="78" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">M = score^0.5 × IoU^6</text>
+
+      <line x1="385" y1="65" x2="440" y2="65" stroke="#ffd700" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <text x="412" y="55" text-anchor="middle" fill="#ffd700" font-size="8" class="mono">max(M)</text>
+
+      <rect x="445" y="35" width="160" height="60" rx="8" fill="#141a2e" stroke="#00d4ff" stroke-width="1.5"/>
+      <text x="525" y="58" text-anchor="middle" fill="#00d4ff" font-size="11" font-weight="600">Ancre Unique</text>
+      <text x="525" y="78" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">topk2=1 · meilleur M</text>
+
+      <line x1="605" y1="65" x2="660" y2="65" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+
+      <rect x="665" y="35" width="210" height="60" rx="8" fill="rgba(0,255,136,0.06)" stroke="#00ff88" stroke-width="1"/>
+      <text x="770" y="58" text-anchor="middle" fill="#00ff88" font-size="11" font-weight="600">1 prédiction / objet</text>
+      <text x="770" y="78" text-anchor="middle" fill="#4a5568" font-size="9" class="mono">NMS inutile à l'inférence</text>
+    </svg>
+  </div>
+
+  <div class="footnote">
+    Source : Wang et al. — Consistent Matching Metric [10] · Ultralytics YOLO26 [11]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 4: STAL -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-stal">
+  <div class="section-title"><span class="dot" style="background:var(--yellow)"></span> STAL — Small-Target-Aware Label Assignment</div>
+  <div class="section-desc">
+    STAL détecte les petits objets (&lt;8px) dont la boîte englobante est trop petite pour être assignée à l'échelle P3 (stride=8). Il agrandit virtuellement la boîte au stride suivant (P4, stride=16) pour garantir un pool d'ancres candidates suffisant.
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Mécanisme d'agrandissement STAL</div>
+    <div class="stal-grid">
+      <div class="stal-box" style="border-color:var(--red);">
+        <div style="font-size:0.7rem;color:var(--red);font-family:'JetBrains Mono',monospace;letter-spacing:1px;margin-bottom:0.8rem;">AVANT STAL</div>
+        <svg viewBox="0 0 200 200" width="100%">
+          <rect x="10" y="10" width="180" height="180" rx="4" fill="#0a0e17" stroke="#1e2a45" stroke-width="1"/>
+          <!-- Grid stride=8 -->
+          <g stroke="#1e2a45" stroke-width="0.3">
+            <line x1="10" y1="32.5" x2="190" y2="32.5"/><line x1="10" y1="55" x2="190" y2="55"/>
+            <line x1="10" y1="77.5" x2="190" y2="77.5"/><line x1="10" y1="100" x2="190" y2="100"/>
+            <line x1="10" y1="122.5" x2="190" y2="122.5"/><line x1="10" y1="145" x2="190" y2="145"/>
+            <line x1="10" y1="167.5" x2="190" y2="167.5"/>
+            <line x1="32.5" y1="10" x2="32.5" y2="190"/><line x1="55" y1="10" x2="55" y2="190"/>
+            <line x1="77.5" y1="10" x2="77.5" y2="190"/><line x1="100" y1="10" x2="100" y2="190"/>
+            <line x1="122.5" y1="10" x2="122.5" y2="190"/><line x1="145" y1="10" x2="145" y2="190"/>
+            <line x1="167.5" y1="10" x2="167.5" y2="190"/>
+          </g>
+          <!-- Tiny object -->
+          <rect x="90" y="90" width="6" height="6" fill="none" stroke="#ff4466" stroke-width="2"/>
+          <text x="100" y="115" text-anchor="middle" fill="#ff4466" font-size="8" class="mono">6×6 px</text>
+          <text x="100" y="130" text-anchor="middle" fill="#4a5568" font-size="7" class="mono">&lt; stride[0]=8</text>
+          <!-- No anchor coverage -->
+          <text x="100" y="170" text-anchor="middle" fill="#ff4466" font-size="8" font-weight="600">0 ancres candidates</text>
+          <text x="100" y="182" text-anchor="middle" fill="#4a5568" font-size="7">objet invisible au TAL</text>
+        </svg>
+      </div>
+
+      <div class="stal-arrow">
+        <svg viewBox="0 0 60 40" width="60">
+          <path d="M 5 20 L 45 20" stroke="#00ff88" stroke-width="3" marker-end="url(#arrow-green)"/>
+          <text x="25" y="14" text-anchor="middle" fill="#00ff88" font-size="6" class="mono">STAL</text>
+        </svg>
+      </div>
+
+      <div class="stal-box" style="border-color:var(--green);">
+        <div style="font-size:0.7rem;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:1px;margin-bottom:0.8rem;">APRÈS STAL</div>
+        <svg viewBox="0 0 200 200" width="100%">
+          <rect x="10" y="10" width="180" height="180" rx="4" fill="#0a0e17" stroke="#1e2a45" stroke-width="1"/>
+          <!-- Grid stride=16 (bigger cells) -->
+          <g stroke="#1e2a45" stroke-width="0.3">
+            <line x1="10" y1="55" x2="190" y2="55"/><line x1="10" y1="100" x2="190" y2="100"/>
+            <line x1="10" y1="145" x2="190" y2="145"/>
+            <line x1="55" y1="10" x2="55" y2="190"/><line x1="100" y1="10" x2="100" y2="190"/>
+            <line x1="145" y1="10" x2="145" y2="190"/>
+          </g>
+          <!-- Original tiny object -->
+          <rect x="90" y="90" width="6" height="6" fill="none" stroke="#ff4466" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <!-- Enlarged box -->
+          <rect x="82" y="82" width="22" height="22" rx="2" fill="rgba(0,255,136,0.1)" stroke="#00ff88" stroke-width="2">
+            <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+          </rect>
+          <text x="93" y="120" text-anchor="middle" fill="#00ff88" font-size="8" class="mono">→ 16×16 px</text>
+          <text x="93" y="135" text-anchor="middle" fill="#4a5568" font-size="7" class="mono">stride[1]=16</text>
+          <!-- Anchor candidates highlighted -->
+          <circle cx="100" cy="100" r="4" fill="rgba(0,212,255,0.3)" stroke="#00d4ff" stroke-width="1.5"/>
+          <circle cx="93" cy="93" r="3" fill="rgba(0,212,255,0.2)" stroke="#00d4ff" stroke-width="1"/>
+          <text x="100" y="170" text-anchor="middle" fill="#00ff88" font-size="8" font-weight="600">Ancres candidates ✓</text>
+          <text x="100" y="182" text-anchor="middle" fill="#4a5568" font-size="7">signal superviseur garanti</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="formula-box">
+    <span class="hl-green">Règle STAL :</span><br><br>
+    <span class="hl-orange">SI</span> max(bbox_w, bbox_h) &lt; stride[0]&nbsp;&nbsp;<span style="color:var(--text3)">// objet plus petit que 8px</span><br>
+    <span class="hl-orange">ALORS</span> agrandir la bbox au stride[1] = 16<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ sélection d'ancres sur la feature map P4 (stride=16)<br><br>
+    <span style="color:var(--text3)">// Garantit ≥1 ancre candidate même pour les objets de &lt;8px</span><br>
+    <span style="color:var(--text3)">// Critique pour piétons éloignés en images fisheye drone</span>
+  </div>
+
+  <div class="footnote">
+    Source : Chakrabarty [13] · Ultralytics YOLO26 Documentation [11]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 5: COMPARAISON -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-comp">
+  <div class="section-title"><span class="dot" style="background:var(--red)"></span> Comparaison NMS vs NMS-Free</div>
+  <div class="section-desc">
+    Tableau synthétique des différences fondamentales entre le pipeline traditionnel (avec NMS) et le pipeline NMS-Free de YOLO26, tant à l'entraînement qu'à l'inférence.
+  </div>
+
+  <div class="diagram-container" style="overflow-x:auto;">
+    <div class="diagram-label">Pipeline NMS-based vs NMS-Free</div>
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th style="width:180px;">Critère</th>
+          <th><span class="badge badge-orange">NMS-Based</span> (YOLOv8/v11)</th>
+          <th><span class="badge badge-cyan">NMS-Free</span> (YOLO26)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600;">Stratégie d'assignation</td>
+          <td>O2M uniquement (TAL topk=10)</td>
+          <td>Double : O2M (entraîn.) + O2O (entraîn.+infér.)</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Têtes de détection</td>
+          <td>Tête unique (cls + bbox)</td>
+          <td>Double tête parallèle avec detach()</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Post-traitement (inférence)</td>
+          <td><span class="badge badge-red">NMS obligatoire</span><br>O(n²), ~4ms sur T4</td>
+          <td><span class="badge badge-green">Aucun</span><br>O(1), sortie directe</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Hyperparamètres inférence</td>
+          <td>N<sub>t</sub> (seuil IoU), τ<sub>c</sub> (seuil confiance)<br><em>à calibrer par domaine</em></td>
+          <td>Aucun hyperparamètre NMS<br><em>max_det=300 uniquement</em></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Régression des coordonnées</td>
+          <td>DFL (Distribution Focal Loss)<br><em>softmax → NPU-hostile</em></td>
+          <td>Régression directe<br><em>sans DFL → export facile</em></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Pondération de la perte</td>
+          <td>Poids fixes (λ<sub>cls</sub>, λ<sub>box</sub>, λ<sub>obj</sub>)</td>
+          <td><span class="badge badge-green">ProgLoss</span> — décroissance O2M, croissance O2O</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Petits objets</td>
+          <td>Assignation standard<br><em>risque de 0 ancre positive</em></td>
+          <td><span class="badge badge-green">STAL</span> — agrandissement auto au stride supérieur</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Optimiseur</td>
+          <td>SGD / AdamW</td>
+          <td><span class="badge badge-green">MuSGD</span> — hybride SGD + Muon</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Export (ONNX, TensorRT)</td>
+          <td>Difficile (NMS dans le graphe<br>ou hors graphe)</td>
+          <td>Natif — graphe pur, sans ops dynamiques</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">mAP (nano, COCO)</td>
+          <td>YOLOv8n : 37.3% · YOLO11n : 39.5%</td>
+          <td>YOLO26n : <strong>40.9%</strong> (+1.4 vs v11)</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Latence CPU ONNX (nano)</td>
+          <td>YOLOv8n : ~80.4ms · v11n : ~56.1ms</td>
+          <td>YOLO26n : <strong>38.9ms</strong> (−30% vs v11)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Performances comparatives — Modèles Nano sur MS-COCO</div>
+    <canvas id="compChart" height="250"></canvas>
+  </div>
+
+  <div class="footnote">
+    Sources : Ultralytics [11] · Sapkota et al. [12] · Chakrabarty [13] · Hidayatullah et al. [14]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 6: DÉPENDANCES -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-deps">
+  <div class="section-title"><span class="dot" style="background:var(--cyan)"></span> Graphe de Dépendances des Composants</div>
+  <div class="section-desc">
+    Chaque innovation de YOLO26 dépend des autres. Ce diagramme montre pourquoi chaque composant est nécessaire et ce qui se passe sans lui.
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Chaîne de dépendances</div>
+    <svg viewBox="0 0 900 350" width="100%">
+      <!-- Nodes -->
+      <g>
+        <rect x="20" y="140" width="140" height="65" rx="10" fill="#141a2e" stroke="#a855f7" stroke-width="2"/>
+        <text x="90" y="168" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="700">Double Tête</text>
+        <text x="90" y="186" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">O2M + O2O</text>
+      </g>
+      <g>
+        <rect x="220" y="30" width="140" height="65" rx="10" fill="#141a2e" stroke="#ff6b35" stroke-width="2"/>
+        <text x="290" y="58" text-anchor="middle" fill="#ff6b35" font-size="11" font-weight="700">TAL O2M</text>
+        <text x="290" y="76" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">topk=10</text>
+      </g>
+      <g>
+        <rect x="220" y="250" width="140" height="65" rx="10" fill="#141a2e" stroke="#00d4ff" stroke-width="2"/>
+        <text x="290" y="278" text-anchor="middle" fill="#00d4ff" font-size="11" font-weight="700">TAL O2O</text>
+        <text x="290" y="296" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">topk=7, topk2=1</text>
+      </g>
+      <g>
+        <rect x="430" y="140" width="140" height="65" rx="10" fill="#141a2e" stroke="#00ff88" stroke-width="2"/>
+        <text x="500" y="168" text-anchor="middle" fill="#00ff88" font-size="11" font-weight="700">ProgLoss</text>
+        <text x="500" y="186" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">w_o2m ↓ w_o2o ↑</text>
+      </g>
+      <g>
+        <rect x="430" y="260" width="140" height="65" rx="10" fill="#141a2e" stroke="#ffd700" stroke-width="2"/>
+        <text x="500" y="288" text-anchor="middle" fill="#ffd700" font-size="11" font-weight="700">STAL</text>
+        <text x="500" y="306" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">petits objets</text>
+      </g>
+      <g>
+        <rect x="640" y="40" width="140" height="65" rx="10" fill="#141a2e" stroke="#ff4466" stroke-width="2"/>
+        <text x="710" y="68" text-anchor="middle" fill="#ff4466" font-size="11" font-weight="700">Sans DFL</text>
+        <text x="710" y="86" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">régression directe</text>
+      </g>
+      <g>
+        <rect x="640" y="140" width="140" height="65" rx="10" fill="#141a2e" stroke="#e0e6f0" stroke-width="1.5"/>
+        <text x="710" y="168" text-anchor="middle" fill="#e0e6f0" font-size="11" font-weight="700">detach()</text>
+        <text x="710" y="186" text-anchor="middle" fill="#8892a8" font-size="8" class="mono">stop-gradient</text>
+      </g>
+
+      <!-- Edges -->
+      <line x1="160" y1="155" x2="216" y2="75" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="160" y1="190" x2="216" y2="270" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="360" y1="62" x2="426" y2="155" stroke="#ff6b35" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="360" y1="282" x2="426" y2="185" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="360" y1="295" x2="426" y2="290" stroke="#00d4ff" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-white)"/>
+      <line x1="570" y1="165" x2="636" y2="165" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrow-white)"/>
+      <line x1="160" y1="172" x2="636" y2="172" stroke="#4a5568" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-white)"/>
+      <line x1="570" y1="155" x2="636" y2="80" stroke="#00ff88" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-white)"/>
+    </svg>
+  </div>
+
+  <div class="dep-header">
+    <span>Composant</span>
+    <span>Pourquoi nécessaire</span>
+    <span>Sans ce composant…</span>
+  </div>
+
+  <div class="dep-card anim-delay-1">
+    <div class="dep-name" style="color:var(--purple);">Double Tête<br><span class="badge badge-purple">Fondation</span></div>
+    <div class="dep-why">Permet d'avoir un signal O2M riche à l'entraînement (convergence rapide du backbone) tout en produisant une sortie O2O sans doublons à l'inférence.</div>
+    <div class="dep-without">→ Avec O2O seul : convergence lente, signal superviseur trop faible. Avec O2M seul : NMS obligatoire à l'inférence.</div>
+  </div>
+
+  <div class="dep-card anim-delay-2">
+    <div class="dep-name" style="color:var(--green);">ProgLoss<br><span class="badge badge-green">Ordonnanceur</span></div>
+    <div class="dep-why">Gère la transition douce d'un signal dominé par O2M vers un signal dominé par O2O. Évite les conflits de gradient entre les deux têtes.</div>
+    <div class="dep-without">→ Avec poids fixes (0.5/0.5) : les deux têtes se disputent le backbone, instabilité de convergence. −0.3% à −0.5% mAP.</div>
+  </div>
+
+  <div class="dep-card anim-delay-3">
+    <div class="dep-name" style="color:var(--cyan);">TAL O2O<br><span class="badge badge-cyan">Assignation</span></div>
+    <div class="dep-why">Sélectionne exactement 1 ancre par objet (topk2=1) avec la meilleure métrique d'alignement M. Élimine structurellement les doublons.</div>
+    <div class="dep-without">→ Avec topk2>1 : plusieurs prédictions par objet → doublons → NMS nécessaire à nouveau.</div>
+  </div>
+
+  <div class="dep-card anim-delay-4">
+    <div class="dep-name" style="color:var(--orange);">TAL O2M<br><span class="badge badge-orange">Superviseur</span></div>
+    <div class="dep-why">Fournit 10 ancres positives par objet : gradient dense et signal superviseur riche pour le backbone et le neck partagés.</div>
+    <div class="dep-without">→ Sans O2M : le backbone reçoit un signal trop épars (1 ancre/objet), convergence lente, features de faible qualité.</div>
+  </div>
+
+  <div class="dep-card anim-delay-5">
+    <div class="dep-name" style="color:var(--yellow);">STAL<br><span class="badge" style="background:rgba(255,215,0,0.15);color:var(--yellow);">Petits objets</span></div>
+    <div class="dep-why">Garantit ≥1 ancre candidate pour les objets &lt;8px en les promouvant au stride supérieur. Critique pour piétons éloignés en vue drone.</div>
+    <div class="dep-without">→ Sans STAL : les objets &lt;8px n'ont aucune ancre candidate → perdus à l'entraînement → rappel effondré sur petits objets.</div>
+  </div>
+
+  <div class="dep-card anim-delay-6">
+    <div class="dep-name" style="color:var(--text);">detach()<br><span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text2);">Isolation</span></div>
+    <div class="dep-why">Empêche les gradients de la tête O2O de modifier les features du backbone. Seule la tête O2M (signal riche) entraîne le backbone.</div>
+    <div class="dep-without">→ Sans detach : la tête O2O (1 ancre/objet) corrompt les features partagées avec un gradient trop bruyant.</div>
+  </div>
+
+  <div class="dep-card anim-delay-7">
+    <div class="dep-name" style="color:var(--red);">Sans DFL<br><span class="badge badge-red">Simplification</span></div>
+    <div class="dep-why">Élimine l'opération softmax (DFL) du graphe, permettant un export natif sur NPU/DSP/microcontrôleurs sans opérations dynamiques.</div>
+    <div class="dep-without">→ Avec DFL : export difficile (softmax non supporté sur certains NPU), latence accrue sur hardware embarqué.</div>
+  </div>
+
+  <div class="footnote">
+    Sources : Ultralytics [11] · Wang et al. [10] · Chakrabarty [13]
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB 7: CODE FLOW -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="panel" id="panel-flow">
+  <div class="section-title"><span class="dot" style="background:var(--purple)"></span> Flux d'Appels du Code</div>
+  <div class="section-desc">
+    Séquence d'appels de fonctions pendant une passe forward d'entraînement, depuis l'entrée de l'image jusqu'au calcul de la perte totale pondérée par ProgLoss.
+  </div>
+
+  <div class="diagram-container">
+    <div class="diagram-label">Séquence d'appels — Entraînement</div>
+
+    <div class="code-flow-step anim-delay-1">
+      <div class="code-flow-line" style="border-color:var(--purple);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">forward(images)</div>
+        <div class="code-flow-desc">Point d'entrée. L'image passe par le backbone et le neck.</div>
+        <div class="code-flow-code">
+          <span class="kw">def</span> <span class="fn">forward</span>(self, images):<br>
+          &nbsp;&nbsp;features = self.<span class="fn">backbone</span>(images)&nbsp;&nbsp;<span class="cm"># C2f / RepVGG</span><br>
+          &nbsp;&nbsp;fpn_out = self.<span class="fn">neck</span>(features)&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># P3, P4, P5</span><br>
+          &nbsp;&nbsp;<span class="kw">return</span> self.<span class="fn">forward_head</span>(fpn_out)
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-2">
+      <div class="code-flow-line" style="border-color:var(--yellow);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">forward_head(fpn_out)</div>
+        <div class="code-flow-desc">Les features FPN alimentent les deux têtes. Les features sont <em>détachées</em> avant la tête O2O.</div>
+        <div class="code-flow-code">
+          <span class="kw">def</span> <span class="fn">forward_head</span>(self, fpn_out):<br>
+          &nbsp;&nbsp;out_o2m = self.<span class="fn">head_o2m</span>(fpn_out)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># gradient normal</span><br>
+          &nbsp;&nbsp;out_o2o = self.<span class="fn">head_o2o</span>(fpn_out.<span class="fn">detach</span>())&nbsp;&nbsp;<span class="cm"># stop-gradient</span><br>
+          &nbsp;&nbsp;<span class="kw">return</span> out_o2m, out_o2o
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-3">
+      <div class="code-flow-line" style="border-color:var(--green);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">E2ELoss(out_o2m, out_o2o, targets)</div>
+        <div class="code-flow-desc">Calcule les deux pertes (O2M et O2O) et les combine avec ProgLoss.</div>
+        <div class="code-flow-code">
+          <span class="kw">def</span> <span class="fn">E2ELoss</span>(self, out_o2m, out_o2o, targets, epoch):<br>
+          &nbsp;&nbsp;loss_o2m = self.<span class="fn">compute_loss</span>(out_o2m, targets, mode=<span class="str">"o2m"</span>)<br>
+          &nbsp;&nbsp;loss_o2o = self.<span class="fn">compute_loss</span>(out_o2o, targets, mode=<span class="str">"o2o"</span>)<br>
+          &nbsp;&nbsp;<span class="kw">return</span> self.<span class="fn">prog_loss</span>(loss_o2m, loss_o2o, epoch)
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-4">
+      <div class="code-flow-line" style="border-color:var(--orange);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">TAL(topk=10) — Assignation O2M</div>
+        <div class="code-flow-desc">Le TaskAlignedAssigner sélectionne les 10 meilleures ancres par objet selon M = score<sup>0.5</sup> × IoU<sup>6.0</sup>.</div>
+        <div class="code-flow-code">
+          <span class="cm"># Branche O2M</span><br>
+          assigner = <span class="fn">TaskAlignedAssigner</span>(topk=<span class="num">10</span>, alpha=<span class="num">0.5</span>, beta=<span class="num">6.0</span>)<br>
+          matches = assigner(pred_scores, pred_bboxes, gt_bboxes)
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-5">
+      <div class="code-flow-line" style="border-color:var(--cyan);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">TAL(topk=7, topk2=1) — Assignation O2O</div>
+        <div class="code-flow-desc">Pré-sélectionne 7 candidates, puis retient uniquement la meilleure (topk2=1) par objet.</div>
+        <div class="code-flow-code">
+          <span class="cm"># Branche O2O</span><br>
+          assigner = <span class="fn">TaskAlignedAssigner</span>(topk=<span class="num">7</span>, topk2=<span class="num">1</span>, alpha=<span class="num">0.5</span>, beta=<span class="num">6.0</span>)<br>
+          matches = assigner(pred_scores, pred_bboxes, gt_bboxes)
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-6">
+      <div class="code-flow-line" style="border-color:var(--red);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">BboxLoss (CIoU) + BCE (classification)</div>
+        <div class="code-flow-desc">Pour chaque branche : perte de localisation CIoU sur les boîtes + BCE (Binary Cross-Entropy) sur les scores.</div>
+        <div class="code-flow-code">
+          loss_bbox = <span class="fn">CIoULoss</span>(pred_bboxes[pos], gt_bboxes[pos])<br>
+          loss_cls  = <span class="fn">BCEWithLogitsLoss</span>(pred_scores, target_scores)<br>
+          branch_loss = loss_bbox + loss_cls
+        </div>
+      </div>
+    </div>
+
+    <div class="code-flow-step anim-delay-7">
+      <div class="code-flow-line" style="border-color:var(--green);"></div>
+      <div class="code-flow-content">
+        <div class="code-flow-fn">ProgLoss(loss_o2m, loss_o2o, epoch)</div>
+        <div class="code-flow-desc">Pondération dynamique : w_o2m décroît de 0.8→0.1, w_o2o croît de 0.2→0.9.</div>
+        <div class="code-flow-code">
+          <span class="kw">def</span> <span class="fn">prog_loss</span>(self, l_o2m, l_o2o, epoch):<br>
+          &nbsp;&nbsp;w = <span class="fn">max</span>(<span class="num">1</span> - epoch / (self.epochs - <span class="num">1</span>), <span class="num">0</span>)<br>
+          &nbsp;&nbsp;w_o2m = w * (<span class="num">0.8</span> - <span class="num">0.1</span>) + <span class="num">0.1</span><br>
+          &nbsp;&nbsp;w_o2o = <span class="num">1.0</span> - w_o2m<br>
+          &nbsp;&nbsp;<span class="kw">return</span> w_o2m * l_o2m + w_o2o * l_o2o
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    Basé sur : Ultralytics YOLO26 source code [11] · Analyse par Chakrabarty [13] · Sapkota et al. [12]
+  </div>
+</div>
+
+</main>
+
+<script>
+// ── Tab Navigation ──
+document.querySelectorAll('#tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'prog') initProgChart();
+    if (btn.dataset.tab === 'comp') initCompChart();
+  });
+});
+
+// ── Architecture Mode Toggle ──
+function setArchMode(mode) {
+  const btns = document.querySelectorAll('.mode-toggle button');
+  btns.forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const trainEls = ['o2m-group','loss-o2m','loss-o2o','progloss-box','train-only-label',
+                     'o2m-to-loss','o2o-to-loss','lo2m-to-prog','lo2o-to-prog','detach-label'];
+  const inferEl = document.getElementById('infer-output');
+  const archLabel = document.getElementById('arch-mode-label');
+  const arrowO2M = document.getElementById('arrow-to-o2m');
+
+  if (mode === 'train') {
+    trainEls.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+    inferEl.style.display = 'none';
+    archLabel.textContent = 'mode entraînement';
+    if (arrowO2M) arrowO2M.style.display = '';
+    document.getElementById('both-label').querySelector('text').textContent = 'ENTRAÎN. + INFÉR.';
+  } else {
+    trainEls.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    inferEl.style.display = '';
+    archLabel.textContent = 'mode inférence';
+    if (arrowO2M) arrowO2M.style.display = 'none';
+    document.getElementById('both-label').querySelector('text').textContent = 'INFÉRENCE SEULE';
+  }
+}
+
+// ── ProgLoss Chart ──
+let progChartInstance = null;
+let progAnimId = null;
+let progAnimRunning = false;
+
+function initProgChart() {
+  if (progChartInstance) return;
+  const canvas = document.getElementById('progChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  progChartInstance = { ctx, w: rect.width, h: rect.height };
+  drawProgChart(500);
+}
+
+function wo2m(t, epochs) {
+  return Math.max(1 - t / (epochs - 1), 0) * (0.8 - 0.1) + 0.1;
+}
+
+function drawProgChart(maxEpoch) {
+  if (!progChartInstance) return;
+  const { ctx, w, h } = progChartInstance;
+  const pad = { t: 30, r: 30, b: 50, l: 60 };
+  const cw = w - pad.l - pad.r;
+  const ch = h - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#1e2a45';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 10; i++) {
+    const y = pad.t + ch * i / 10;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke();
+  }
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.l + cw * i / 5;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#4a5568';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 10; i++) {
+    ctx.fillText((1 - i / 10).toFixed(1), pad.l - 8, pad.t + ch * i / 10 + 4);
+  }
+  ctx.textAlign = 'center';
+  const epochs = 500;
+  for (let i = 0; i <= 5; i++) {
+    ctx.fillText(Math.round(epochs * i / 5), pad.l + cw * i / 5, pad.t + ch + 20);
+  }
+
+  ctx.fillStyle = '#8892a8';
+  ctx.font = '11px "Space Grotesk", sans-serif';
+  ctx.fillText('Époque', pad.l + cw / 2, h - 5);
+  ctx.save();
+  ctx.translate(14, pad.t + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Poids', 0, 0);
+  ctx.restore();
+
+  const points = Math.min(maxEpoch, epochs);
+
+  // O2M line
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(255,107,53,0.5)';
+  ctx.shadowBlur = 8;
+  for (let t = 0; t <= points; t++) {
+    const x = pad.l + (t / epochs) * cw;
+    const y = pad.t + (1 - wo2m(t, epochs)) * ch;
+    t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // O2O line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(0,212,255,0.5)';
+  ctx.shadowBlur = 8;
+  for (let t = 0; t <= points; t++) {
+    const x = pad.l + (t / epochs) * cw;
+    const y = pad.t + (1 - (1 - wo2m(t, epochs))) * ch;
+    t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Crossover line
+  if (points > 170) {
+    const crossT = 249.5;
+    const cx2 = pad.l + (crossT / epochs) * cw;
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(cx2, pad.t); ctx.lineTo(cx2, pad.t + ch); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('croisement ≈ ép. 250', cx2, pad.t - 8);
+  }
+
+  // Current epoch marker
+  if (maxEpoch < epochs) {
+    const ex = pad.l + (maxEpoch / epochs) * cw;
+    const ey1 = pad.t + (1 - wo2m(maxEpoch, epochs)) * ch;
+    const ey2 = pad.t + (1 - (1 - wo2m(maxEpoch, epochs))) * ch;
+
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath(); ctx.arc(ex, ey1, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath(); ctx.arc(ex, ey2, 5, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#e0e6f0';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`ép.${maxEpoch}`, ex + 10, ey1 - 5);
+    ctx.fillStyle = '#ff6b35';
+    ctx.fillText(`w_o2m=${wo2m(maxEpoch, epochs).toFixed(2)}`, ex + 10, ey1 + 10);
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText(`w_o2o=${(1 - wo2m(maxEpoch, epochs)).toFixed(2)}`, ex + 10, ey2 + 10);
+  }
+
+  // Labels
+  ctx.font = '12px "JetBrains Mono", monospace';
+  ctx.fillStyle = '#ff6b35';
+  ctx.textAlign = 'left';
+  ctx.fillText('w_o2m = 0.80', pad.l + 8, pad.t + (1 - 0.8) * ch - 8);
+  ctx.fillStyle = '#00d4ff';
+  ctx.fillText('w_o2o = 0.90', pad.l + cw - 120, pad.t + (1 - 0.9) * ch - 8);
+}
+
+function toggleProgAnim() {
+  if (progAnimRunning) {
+    cancelAnimationFrame(progAnimId);
+    progAnimRunning = false;
+    document.getElementById('playBtn').textContent = '▶ Animer';
+    drawProgChart(500);
+    return;
+  }
+  progAnimRunning = true;
+  document.getElementById('playBtn').textContent = '⏹ Arrêter';
+  let epoch = 0;
+  function step() {
+    drawProgChart(epoch);
+    epoch += 3;
+    if (epoch <= 500 && progAnimRunning) {
+      progAnimId = requestAnimationFrame(step);
+    } else {
+      progAnimRunning = false;
+      document.getElementById('playBtn').textContent = '▶ Animer';
+      drawProgChart(500);
+    }
+  }
+  step();
+}
+
+// ── Comparison Chart ──
+let compChartDone = false;
+
+function initCompChart() {
+  if (compChartDone) return;
+  compChartDone = true;
+  const canvas = document.getElementById('compChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 250 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '250px';
+
+  const w = rect.width, h = 250;
+  const pad = { t: 30, r: 20, b: 60, l: 50 };
+  const cw = w - pad.l - pad.r;
+  const ch = h - pad.t - pad.b;
+
+  const models = ['YOLOv8n', 'YOLOv10n', 'YOLO11n', 'YOLO26n'];
+  const mAP = [37.3, 38.5, 39.5, 40.9];
+  const colors = ['#4a5568', '#8892a8', '#a855f7', '#00d4ff'];
+  const barW = cw / models.length * 0.6;
+  const gap = cw / models.length;
+  const maxVal = 42;
+
+  ctx.strokeStyle = '#1e2a45'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + ch * i / 5;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke();
+    ctx.fillStyle = '#4a5568';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText((maxVal - (maxVal * i / 5)).toFixed(0) + '%', pad.l - 8, y + 4);
+  }
+
+  models.forEach((m, i) => {
+    const x = pad.l + gap * i + (gap - barW) / 2;
+    const barH = (mAP[i] / maxVal) * ch;
+    const y = pad.t + ch - barH;
+
+    const grad = ctx.createLinearGradient(x, y, x, pad.t + ch);
+    grad.addColorStop(0, colors[i]);
+    grad.addColorStop(1, colors[i] + '33');
+    ctx.fillStyle = grad;
+
+    ctx.beginPath();
+    const r = 4;
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + barW - r, y);
+    ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+    ctx.lineTo(x + barW, pad.t + ch);
+    ctx.lineTo(x, pad.t + ch);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.fill();
+
+    if (i === 3) {
+      ctx.shadowColor = 'rgba(0,212,255,0.4)';
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = colors[i];
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(mAP[i] + '%', x + barW / 2, y - 8);
+
+    ctx.fillStyle = '#8892a8';
+    ctx.font = '10px "Space Grotesk", sans-serif';
+    ctx.fillText(m, x + barW / 2, pad.t + ch + 18);
+
+    const nmsLabels = ['NMS', 'NMS-Free', 'NMS', 'NMS-Free'];
+    const nmsColors = ['#ff4466', '#00ff88', '#ff4466', '#00ff88'];
+    ctx.fillStyle = nmsColors[i];
+    ctx.font = '8px "JetBrains Mono", monospace';
+    ctx.fillText(nmsLabels[i], x + barW / 2, pad.t + ch + 34);
+  });
+
+  ctx.fillStyle = '#8892a8';
+  ctx.font = '11px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('mAP50:95 sur MS-COCO val — Modèles Nano', w / 2, h - 5);
+}
+
+// ── Init first chart if visible ──
+setTimeout(() => {
+  if (document.getElementById('panel-prog').classList.contains('active')) initProgChart();
+  if (document.getElementById('panel-comp').classList.contains('active')) initCompChart();
+}, 100);
+
+// ── Reveal on scroll ──
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

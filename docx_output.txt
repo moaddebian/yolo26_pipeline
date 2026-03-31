@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys; sys.stdout.reconfigure(encoding='utf-8'); from docx import Document; doc = Document('NMS-Free dans Yolov26.docx'); [print(p.text) for p in doc.paragraphs]; [print('TABLE: ' + ' | '.join(c.text for c in r.cells)) for t in doc.tables for r in t.rows]
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'docx'

@@ -1,0 +1,341 @@
+=== SLIDE 1 ===
+Synth├¿se des M├®thodes de Fusion
+de Bo├«tes Englobantes
+De la Suppression par Maximum Local au Pipeline End-to-End NMS-Free
+Pr├®sent├® par :
+Moad Dabyane
+Encadrant :
+Yassir Zardoua
+R├®f├®rence :
+Stage #02-2026 ┬À Caplogy Innovation, F├¿s
+Date :
+24 Mars 2026 
+7 m├®thodes
+analys├®es
+2006 ÔåÆ 2026
+20 ans d'├®volution
+NMS-Free
+YOLO26 natif
+Fisheye 180┬░
+application drone
+Stage de recherche : D├®tection de pi├®tons ├á partir de projections multiples optimales d'images fisheye
+1 / 6
+
+=== SLIDE 2 ===
+Vue d'ensemble ÔÇö 7 M├®thodes
+Progression 2006 ÔåÆ 2026  ┬À  NMS Standard ÔåÆ Architecture NMS-Free
+01
+NMS
+Standard
+Baseline
+06
+2006
+ICPR
+02
+Soft-NMS
+Plug & Play
+17
+2017
+ICCV
+03
+DIoU-NMS
+Plug & Play
+20
+2020
+AAAI
+04
+Adaptive
+NMS
+R├®entra├«n.
+19
+2019
+CVPR
+05
+BBR
+CIoU
+Training
+20
+2020
+AAAI
+06
+WBF
+Fusion
+21
+2021
+IVC
+07
+NMS-Free
+YOLO26
+E2E
+26
+2026
+arXiv
+Suppression
+binaire
+irr├®versible
+D├®gradation
+Gaussienne
+du score
+Distance
+centres
+des bo├«tes
+Seuil
+dynamique
+densit├®
+Raffinement
+localisation
+entra├«n.
+Fusion
+pond├®r├®e
+toutes bo├«tes
+NMS supprim├®
+architecture
+E2E
+Progression : suppression binaire  ÔåÆ  pond├®ration continue  ÔåÆ  fusion  ÔåÆ  ├®limination architecturale
+Cat├®gories :
+Baseline
+Plug & Play (0 r├®entra├«n.)
+R├®entra├«nement requis
+Fusion multi-sources
+Architecture E2E NMS-Free
+Stage #02-2026  ┬À  Caplogy Innovation  ┬À  M├®thodes NMS & NMS-Free  ┬À  Mars 2026
+2 / 6
+
+=== SLIDE 3 ===
+Tableau des Crit├¿res par M├®thode
+Quels composants chaque m├®thode utilise-t-elle ?
+M├®thode
+IoU
+Confiance
+Gaussienne
+Dist.
+centres
+Densit├®
+locale
+Fusion
+coord.
+R├®entr.
+Complexit├®
+NMS Standard
+Ô£ô
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ù
+Ô£ù
+Ô£ù
+O(n┬▓)
+Soft-NMS
+Ô£ô
+Ô£ô
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ù
+Ô£ù
+O(n┬▓)
+DIoU-NMS
+Ô£ô (DIoU)
+Ô£ô
+Ô£ù
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ù
+O(n┬▓)
+Adaptive NMS
+Ô£ô
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ô
+Ô£ù
+Ô£ô
+O(n┬▓)
+BBR / CIoU
+Ô£ô (CIoU)
+Ô£ù
+Ô£ù
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ô
+Entra├«n.
+WBF
+Ô£ô
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ù
+Ô£ô
+Ô£ù
+3├ùNMS
+NMS-Free YOLO26
+Ô£ô (O2O)
+Ô£ô
+Ô£ù
+Ô£ù
+Ô£ù
+Partiel
+Ô£ô
+O(1) E2E
+L├®gende :
+Ô£ô = crit├¿re utilis├®     Ô£ù = non utilis├®     IoU = Intersection over Union     Gaussienne = exp(ÔêÆIoU┬▓/¤â)     Dist. centres = d(cA,cB)┬▓/c┬▓     Densit├® = seuil adaptatif appris
+­ƒÆí  Observation cl├® : seules WBF et NMS-Free YOLO26 effectuent une fusion de coordonn├®es ÔÇö essentielle pour r├®duire le jitter dans le pipeline fisheye multi-projections.
+Stage #02-2026  ┬À  Caplogy Innovation  ┬À  M├®thodes NMS & NMS-Free  ┬À  Mars 2026
+3 / 6
+
+=== SLIDE 4 ===
+Analyse Comparative ÔÇö Performances & Guide de S├®lection
+Synth├¿se selon les crit├¿res du stage  
+M├®thode
+Sc. denses
+Multi-vues
+Fusion coord.
+R├®entr.
+Complexit├®
+NMS Standard
+Ô£ù
+Ô£ù
+Non
+Non
+O(n┬▓)
+Soft-NMS
+~
+~
+Non
+Non
+O(n┬▓)
+DIoU-NMS
++
++
+Non
+Non
+O(n┬▓)
+Adaptive NMS
+++
+~
+Non
+Oui
+O(n┬▓)
+BBR / CIoU
+ÔÇö
+ÔÇö
+Oui
+Oui
+Entra├«n.
+WBF
+++
+++
+Oui
+Non
+3├ùNMS
+NMS-Free YOLO26
++
++
+Partiel
+Oui
+O(1) E2E
+Guide de s├®lection pour ce projet
+  Am├®lioration imm├®diate
+Soft-NMS  +1.1% mAP ┬À plug-and-play
+  Foule dense
+Adaptive NMS  ÔêÆ3.4 pts MRÔü╗┬▓ CrowdHuman
+  Fusion inter-projections
+WBF  wßÁó = cßÁó ┬À ╬┤ßÁó  ┬À  0 suppression
+  Latence min. embarqu├®
+YOLO26 NMS-Free  ÔêÆ43% CPU ┬À export E2E natif
+  Pr├®cision localisation
+CIoU Loss  +1.5% mAP cumulatif
+Stage #02-2026  ┬À  Caplogy Innovation  ┬À  M├®thodes NMS & NMS-Free  ┬À  Mars 2026
+4 / 6
+
+=== SLIDE 5 ===
+Pipeline Recommand├® : YOLO26 NMS-Free + WBF Pond├®r├®e
+Pipeline propos├®
+Image
+Fisheye 180┬░
+Entr├®e
+ÔûÂ
+N Projections
+Gnomoniques
+GPU ┬À patches perspectifs
+ÔûÂ
+YOLO26
+NMS-Free
+par patch ┬À O2O head
+ÔûÂ
+Reprojection
+Fisheye
+GPU ┬À coordonn├®es fisheye
+ÔûÂ
+WBF Pond├®r├®e
+wßÁó = cßÁó┬À╬┤ßÁó
+inter-projections
+ÔûÂ
+D├®tections
+Finales
+1 bo├«te / pi├®ton
+Ô£ô 1 bo├«te / pi├®ton / patch
+Ô£ô Sans NMS intra-patch
+Ô£ô STAL pi├®tons ├®loign├®s
+Ô£ô Compatible NPU/DSP
+Ô£ô Fusion coordonn├®es
+Ô£ô R├®duit le jitter
+Ô£ô wßÁó = cßÁó ┬À ╬┤ßÁó
+Ô£ô Centre ÔåÆ poids fort
+ÔÜá  Points d'attention pour l'int├®gration
+Ôæá  Fine-tuning YOLO26
+Donn├®es fisheye annot├®es ÔÇö bo├«tes atypiques (formes trap├®zo├»dales)
+Ôæí  Calibration ¤äs (STAL)
+Ajuster au ratio surface/image selon altitude de vol du drone
+Ôæó  Calibration ╬© (WBF)
+Seuil clustering tenant compte des distorsions de reprojection
+Ôæú  Filtre Kalman / EMA
+Stabilisation temporelle inter-frames ÔÇö r├®duction jitter r├®siduel
+Pond├®ration WBF Fisheye :
+wßÁó = cßÁó ┬À ╬┤ßÁó
+o├╣  cßÁó = score YOLO26   ┬À   ╬┤ßÁó = distance normalis├®e au bord de projection   ┬À   Centre ÔåÆ ╬┤ßÁó Ôëê 1 (poids fort)   ┬À   Bord ÔåÆ ╬┤ßÁó Ôëê 0 (poids r├®duit)
+Stage #02-2026  ┬À  Caplogy Innovation  ┬À  M├®thodes NMS & NMS-Free  ┬À  Mars 2026
+5 / 6
+
+=== SLIDE 6 ===
+Conclusion & R├®f├®rences
+De NMS Standard (2006) au Pipeline End-to-End NMS-Free (2026)
+Progression naturelle
+NMS Standard  ÔåÆ  Soft-NMS  ÔåÆ  DIoU  ÔåÆ  Adaptive NMS  ÔåÆ  BBR/CIoU  ÔåÆ  WBF  ÔåÆ  YOLO26 NMS-Free
+ÔêÆ43%
+CPU YOLO26
+vs YOLO11n
+56.4%
+mAP WBF
+COCO test-dev
+ÔêÆ3.4 pts
+MRÔü╗┬▓ Adaptive
+NMS Crowd
++1.5%
+mAP BBR
+cumulatif
+Pipeline fisheye optimal
+YOLO26 NMS-Free  (intra-projection)  +  WBF wßÁó=cßÁó┬À╬┤ßÁó  (inter-projections)  +  STAL pi├®tons ├®loign├®s
+R├®f├®rences
+[1]  Neubeck & Van Gool, ICPR 2006 ÔÇö NMS Standard
+[2]  Bodla et al., ICCV 2017 ÔÇö Soft-NMS
+[3]  Zheng et al., AAAI 2020 ÔÇö DIoU-NMS & CIoU
+[4]  Liu et al., CVPR 2019 ÔÇö Adaptive NMS
+[5]  Ren et al., NeurIPS 2015 ÔÇö Faster R-CNN
+[6]  Solovyev et al., IVC 2021 ÔÇö WBF
+[7]  Wang et al., NeurIPS 2024 ÔÇö YOLOv10 NMS-Free
+[8]  Jocher & Qiu, Ultralytics 2026 ÔÇö YOLO26
+[9]  Sapkota et al., arXiv:2509.25164, 2025
+[10] Chakrabarty, arXiv:2601.12882, 2026
+[11] Hidayatullah et al., arXiv:2602.14582, 2026
+├Ç retenir pour le stage
+Ôû© Soft-NMS : am├®lioration plug-and-play imm├®diate sans r├®entra├«nement
+Ôû© Adaptive NMS : meilleur r├®sultat foule dense si fine-tuning possible
+Ôû© WBF : seule m├®thode fusionnant toutes les coordonn├®es ÔÇö id├®al inter-projections
+Ôû© YOLO26 NMS-Free : supprime NMS architecturalement + ÔêÆ43% CPU + export E2E natif
+Ôû© Pipeline optimal : YOLO26 (intra-patch) + WBF pond├®r├®e (inter-projections)
+Stage #02-2026  ┬À  Caplogy Innovation  ┬À  M├®thodes NMS & NMS-Free  ┬À  Mars 2026
+6 / 6
+

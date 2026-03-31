@@ -1,0 +1,346 @@
+=== SLIDE 1 ===
+Synthèse des Méthodes de Fusion
+de Boîtes Englobantes
+De la Suppression par Maximum Local au Pipeline End-to-End NMS-Free
+Présenté par :
+Moad Dabyane
+Encadrant :
+Yassir Zardoua
+Référence :
+Stage #02-2026 · Caplogy Innovation, Fès
+Date :
+24 Mars 2026 
+7 méthodes
+analysées
+2006 → 2026
+20 ans d'évolution
+NMS-Free
+YOLO26 natif
+Fisheye 180°
+application drone
+Stage de recherche : Détection de piétons à partir de projections multiples optimales d'images fisheye
+1 / 6
+
+=== SLIDE 2 ===
+Vue d'ensemble — 7 Méthodes
+Progression 2006 → 2026  ·  NMS Standard → Architecture NMS-Free
+01
+NMS
+Standard
+Baseline
+06
+2006
+ICPR
+02
+Soft-NMS
+Plug & Play
+17
+2017
+ICCV
+03
+DIoU-NMS
+Plug & Play
+20
+2020
+AAAI
+04
+Adaptive
+NMS
+Réentraîn.
+19
+2019
+CVPR
+05
+BBR
+CIoU
+Training
+20
+2020
+AAAI
+06
+WBF
+Fusion
+21
+2021
+IVC
+07
+NMS-Free
+YOLO26
+E2E
+26
+2026
+arXiv
+Suppression
+binaire
+irréversible
+Dégradation
+Gaussienne
+du score
+Distance
+centres
+des boîtes
+Seuil
+dynamique
+densité
+Raffinement
+localisation
+entraîn.
+Fusion
+pondérée
+toutes boîtes
+NMS supprimé
+architecture
+E2E
+Progression : suppression binaire  →  pondération continue  →  fusion  →  élimination architecturale
+Catégories :
+Baseline
+Plug & Play (0 réentraîn.)
+Réentraînement requis
+Fusion multi-sources
+Architecture E2E NMS-Free
+Stage #02-2026  ·  Caplogy Innovation  ·  Méthodes NMS & NMS-Free  ·  Mars 2026
+2 / 6
+
+=== SLIDE 3 ===
+Tableau des Critères par Méthode
+Quels composants chaque méthode utilise-t-elle ?
+Méthode
+IoU
+Confiance
+Gaussienne
+Dist.
+centres
+Densité
+locale
+Fusion
+coord.
+Réentr.
+Complexité
+NMS Standard
+✓
+✓
+✗
+✗
+✗
+✗
+✗
+O(n²)
+Soft-NMS
+✓
+✓
+✓
+✗
+✗
+✗
+✗
+O(n²)
+DIoU-NMS
+✓ (DIoU)
+✓
+✗
+✓
+✗
+✗
+✗
+O(n²)
+Adaptive NMS
+✓
+✓
+✗
+✗
+✓
+✗
+✓
+O(n²)
+BBR / CIoU
+✓ (CIoU)
+✗
+✗
+✓
+✗
+✗
+✓
+Entraîn.
+WBF
+✓
+✓
+✗
+✗
+✗
+✓
+✗
+3×NMS
+NMS-Free YOLO26
+✓ (O2O)
+✓
+✗
+✗
+✗
+Partiel
+✓
+O(1) E2E
+Légende :
+✓ = critère utilisé     ✗ = non utilisé     IoU = Intersection over Union     Gaussienne = exp(−IoU²/σ)     Dist. centres = d(cA,cB)²/c²     Densité = seuil adaptatif appris
+💡  Observation clé : seules WBF et NMS-Free YOLO26 effectuent une fusion de coordonnées — essentielle pour réduire le jitter dans le pipeline fisheye multi-projections.
+Stage #02-2026  ·  Caplogy Innovation  ·  Méthodes NMS & NMS-Free  ·  Mars 2026
+3 / 6
+
+=== SLIDE 4 ===
+Analyse Comparative — Performances & Guide de Sélection
+Synthèse selon les critères du stage  
+Méthode
+Sc. denses
+Multi-vues
+Fusion coord.
+Réentr.
+Complexité
+NMS Standard
+✗
+✗
+Non
+Non
+O(n²)
+Soft-NMS
+~
+~
+Non
+Non
+O(n²)
+DIoU-NMS
++
++
+Non
+Non
+O(n²)
+Adaptive NMS
+++
+~
+Non
+Oui
+O(n²)
+BBR / CIoU
+—
+—
+Oui
+Oui
+Entraîn.
+WBF
+++
+++
+Oui
+Non
+3×NMS
+NMS-Free YOLO26
++
++
+Partiel
+Oui
+O(1) E2E
+Guide de sélection pour ce projet
+  Amélioration immédiate
+Soft-NMS  +1.1% mAP · plug-and-play
+  Foule dense
+Adaptive NMS  −3.4 pts MR⁻² CrowdHuman
+  Fusion inter-projections
+WBF  wᵢ = cᵢ · δᵢ  ·  0 suppression
+  Latence min. embarqué
+YOLO26 NMS-Free  −43% CPU · export E2E natif
+  Précision localisation
+CIoU Loss  +1.5% mAP cumulatif
+Stage #02-2026  ·  Caplogy Innovation  ·  Méthodes NMS & NMS-Free  ·  Mars 2026
+4 / 6
+
+=== SLIDE 5 ===
+Pipeline Recommandé : YOLO26 NMS-Free + WBF Pondérée
+Pipeline proposé
+Image
+Fisheye 180°
+Entrée
+▶
+N Projections
+Gnomoniques
+GPU · patches perspectifs
+▶
+YOLO26
+NMS-Free
+par patch · O2O head
+▶
+Reprojection
+Fisheye
+GPU · coordonnées fisheye
+▶
+WBF Pondérée
+wᵢ = cᵢ·δᵢ
+inter-projections
+▶
+Détections
+Finales
+1 boîte / piéton
+✓ 1 boîte / piéton / patch
+✓ Sans NMS intra-patch
+✓ STAL piétons éloignés
+✓ Compatible NPU/DSP
+✓ Fusion coordonnées
+✓ Réduit le jitter
+✓ wᵢ = cᵢ · δᵢ
+✓ Centre → poids fort
+⚠  Points d'attention pour l'intégration
+①  Fine-tuning YOLO26
+Données fisheye annotées — boîtes atypiques (formes trapézoïdales)
+②  Calibration τs (STAL)
+Ajuster au ratio surface/image selon altitude de vol du drone
+③  Calibration θ (WBF)
+Seuil clustering tenant compte des distorsions de reprojection
+④  Filtre Kalman / EMA
+Stabilisation temporelle inter-frames — réduction jitter résiduel
+Pondération WBF Fisheye :
+wᵢ = cᵢ · δᵢ
+où  cᵢ = score YOLO26   ·   δᵢ = distance normalisée au bord de projection   ·   Centre → δᵢ ≈ 1 (poids fort)   ·   Bord → δᵢ ≈ 0 (poids réduit)
+Stage #02-2026  ·  Caplogy Innovation  ·  Méthodes NMS & NMS-Free  ·  Mars 2026
+5 / 6
+
+=== SLIDE 6 ===
+Conclusion & Références
+De NMS Standard (2006) au Pipeline End-to-End NMS-Free (2026)
+Progression naturelle
+NMS Standard  →  Soft-NMS  →  DIoU  →  Adaptive NMS  →  BBR/CIoU  →  WBF  →  YOLO26 NMS-Free
+−43%
+CPU YOLO26
+vs YOLO11n
+56.4%
+mAP WBF
+COCO test-dev
+−3.4 pts
+MR⁻² Adaptive
+NMS Crowd
++1.5%
+mAP BBR
+cumulatif
+Pipeline fisheye optimal
+YOLO26 NMS-Free  (intra-projection)  +  WBF wᵢ=cᵢ·δᵢ  (inter-projections)  +  STAL piétons éloignés
+Références
+[1]  Neubeck & Van Gool, ICPR 2006 — NMS Standard
+[2]  Bodla et al., ICCV 2017 — Soft-NMS
+[3]  Zheng et al., AAAI 2020 — DIoU-NMS & CIoU
+[4]  Liu et al., CVPR 2019 — Adaptive NMS
+[5]  Ren et al., NeurIPS 2015 — Faster R-CNN
+[6]  Solovyev et al., IVC 2021 — WBF
+[7]  Wang et al., NeurIPS 2024 — YOLOv10 NMS-Free
+[8]  Jocher & Qiu, Ultralytics 2026 — YOLO26
+[9]  Sapkota et al., arXiv:2509.25164, 2025
+[10] Chakrabarty, arXiv:2601.12882, 2026
+[11] Hidayatullah et al., arXiv:2602.14582, 2026
+À retenir pour le stage
+▸ Soft-NMS : amélioration plug-and-play immédiate sans réentraînement
+▸ Adaptive NMS : meilleur résultat foule dense si fine-tuning possible
+▸ WBF : seule méthode fusionnant toutes les coordonnées — idéal inter-projections
+▸ YOLO26 NMS-Free : supprime NMS architecturalement + −43% CPU + export E2E natif
+▸ Pipeline optimal : YOLO26 (intra-patch) + WBF pondérée (inter-projections)
+Stage #02-2026  ·  Caplogy Innovation  ·  Méthodes NMS & NMS-Free  ·  Mars 2026
+6 / 6
+
+
+
+========== DOCX CONTENT ==========
+
+

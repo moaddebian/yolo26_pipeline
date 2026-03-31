@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOLO26 NMS-Free — Entraînement Complet en Détail</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06090f;
+  --bg2: #0c1018;
+  --bg3: #111827;
+  --panel: #141c2b;
+  --border: #1e293b;
+  --cyan: #00d4ff;
+  --orange: #ff6b35;
+  --green: #00ff88;
+  --red: #ff4757;
+  --purple: #a855f7;
+  --yellow: #fbbf24;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  overflow-x: hidden;
+}
+
+.header {
+  background: linear-gradient(135deg, var(--bg2) 0%, #0a1628 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 24px 32px;
+  text-align: center;
+}
+.header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+.header p { color: var(--text2); margin-top: 6px; font-size: 14px; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.tab {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tab:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+.tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0,212,255,0.04); }
+
+/* Content */
+.content { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* Step cards */
+.step {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.step::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+}
+.step.s-cyan::before { background: var(--cyan); }
+.step.s-orange::before { background: var(--orange); }
+.step.s-green::before { background: var(--green); }
+.step.s-purple::before { background: var(--purple); }
+.step.s-red::before { background: var(--red); }
+.step.s-yellow::before { background: var(--yellow); }
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.s-cyan .step-num { background: rgba(0,212,255,0.15); color: var(--cyan); }
+.s-orange .step-num { background: rgba(255,107,53,0.15); color: var(--orange); }
+.s-green .step-num { background: rgba(0,255,136,0.15); color: var(--green); }
+.s-purple .step-num { background: rgba(168,85,247,0.15); color: var(--purple); }
+.s-red .step-num { background: rgba(255,71,87,0.15); color: var(--red); }
+.s-yellow .step-num { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+.step h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.step p, .step li { font-size: 14px; line-height: 1.7; color: var(--text2); }
+.step ul { padding-left: 18px; }
+.step li { margin-bottom: 4px; }
+
+.why-box {
+  background: rgba(0,212,255,0.06);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+.why-box .label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+.why-box p { font-size: 13px; color: var(--text); }
+
+.code-block {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 14px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #c9d1d9;
+}
+.code-block .cm { color: #8b949e; }
+.code-block .kw { color: #ff7b72; }
+.code-block .fn { color: #d2a8ff; }
+.code-block .st { color: #a5d6ff; }
+.code-block .num { color: #79c0ff; }
+.code-block .var { color: #ffa657; }
+.code-block .op { color: #ff7b72; }
+.code-block .cls { color: #7ee787; }
+.code-block .hl { background: rgba(0,212,255,0.08); display: block; margin: 0 -16px; padding: 0 16px; border-left: 3px solid var(--cyan); }
+.code-block .hl-o { background: rgba(255,107,53,0.08); display: block; margin: 0 -16px; padding: 0 16px; border-left: 3px solid var(--orange); }
+.code-block .hl-g { background: rgba(0,255,136,0.08); display: block; margin: 0 -16px; padding: 0 16px; border-left: 3px solid var(--green); }
+
+h2.section-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+}
+.subtitle { color: var(--text2); font-size: 14px; margin-bottom: 28px; }
+
+/* SVG diagrams */
+.diagram-container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+  overflow-x: auto;
+}
+.diagram-container h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+/* Tables */
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  background: rgba(0,212,255,0.08);
+  color: var(--cyan);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text2);
+  line-height: 1.5;
+}
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tag-cyan { background: rgba(0,212,255,0.12); color: var(--cyan); }
+.tag-orange { background: rgba(255,107,53,0.12); color: var(--orange); }
+.tag-green { background: rgba(0,255,136,0.12); color: var(--green); }
+.tag-red { background: rgba(255,71,87,0.12); color: var(--red); }
+.tag-purple { background: rgba(168,85,247,0.12); color: var(--purple); }
+.tag-yellow { background: rgba(251,191,36,0.12); color: var(--yellow); }
+
+.connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+  color: var(--text3);
+  font-size: 20px;
+}
+
+/* ProgLoss chart */
+#proglossCanvas {
+  width: 100%;
+  max-width: 700px;
+  height: 350px;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Demo */
+.demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (max-width: 768px) {
+  .demo-grid { grid-template-columns: 1fr; }
+}
+.demo-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.demo-panel h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.anchor-grid {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+}
+.anchor-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  transition: all 0.3s;
+  cursor: default;
+}
+.anchor-cell.bg { background: #1a2035; }
+.anchor-cell.positive-o2m { background: var(--orange); opacity: 0.7; }
+.anchor-cell.positive-o2o { background: var(--cyan); }
+.anchor-cell.gt { background: var(--green); border: 2px solid var(--green); }
+.anchor-cell.negative { background: #1a2035; }
+
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.btn {
+  padding: 8px 20px;
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.3);
+  color: var(--cyan);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn:hover { background: rgba(0,212,255,0.2); }
+.btn.btn-orange { background: rgba(255,107,53,0.1); border-color: rgba(255,107,53,0.3); color: var(--orange); }
+.btn.btn-orange:hover { background: rgba(255,107,53,0.2); }
+
+.arrow-down {
+  text-align: center;
+  padding: 12px 0;
+  font-size: 24px;
+  color: var(--text3);
+}
+
+.file-tag {
+  display: inline-block;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--cyan);
+  margin-bottom: 8px;
+}
+
+.epoch-slider {
+  width: 100%;
+  margin: 16px 0;
+  accent-color: var(--cyan);
+}
+
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.metric-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.metric-card .value {
+  font-size: 28px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.metric-card .label {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>YOLO26 NMS-Free — Entraînement Complet en Détail</h1>
+  <p>Chaque étape, chaque ligne de code, chaque "pourquoi ?" — Rien n'est sauté</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab(0)">1. Étapes d'Entraînement</div>
+  <div class="tab" onclick="showTab(1)">2. TAL en Détail</div>
+  <div class="tab" onclick="showTab(2)">3. Démonstration</div>
+  <div class="tab" onclick="showTab(3)">4. Résumé — Pourquoi ?</div>
+  <div class="tab" onclick="showTab(4)">5. Code Source</div>
+  <div class="tab" onclick="showTab(5)">6. Simulation Complète</div>
+</div>
+
+<div class="content">
+
+<!-- ==================== TAB 1: ÉTAPES D'ENTRAÎNEMENT ==================== -->
+<div class="section active" id="sec0">
+  <h2 class="section-title">Les Étapes d'Entraînement de YOLO26 — Rien n'est Sauté</h2>
+  <p class="subtitle">Chaque étape qui se déroule depuis le chargement des données jusqu'au calcul du gradient, pour UNE itération d'entraînement</p>
+
+  <!-- STEP 0 -->
+  <div class="step s-purple">
+    <div class="step-num">0</div>
+    <h3>Initialisation du modèle et des losses</h3>
+    <p>Avant toute chose, le modèle et le système de perte sont créés :</p>
+    <div class="code-block">
+<span class="cm"># Le modèle YOLO26 est créé avec end2end=True</span>
+<span class="cm"># head.py — Detect.__init__()</span>
+<span class="var">nc</span> = <span class="num">80</span>       <span class="cm"># nombre de classes (COCO)</span>
+<span class="var">reg_max</span> = <span class="num">1</span>   <span class="cm"># PAS de DFL ! Régression directe des coordonnées</span>
+<span class="var">end2end</span> = <span class="kw">True</span> <span class="cm"># Active la double tête</span>
+
+<span class="cm"># Tête O2M (one-to-many) — cv2 pour box, cv3 pour classification</span>
+<span class="var">self</span>.cv2 = [Conv→Conv→Conv2d(out=4)] × <span class="num">3</span> niveaux  <span class="cm"># régression de boîtes</span>
+<span class="var">self</span>.cv3 = [DWConv→Conv→DWConv→Conv→Conv2d(out=80)] × <span class="num">3</span>  <span class="cm"># classification</span>
+
+<span class="cm"># Tête O2O (one-to-one) — copie INDÉPENDANTE de la tête O2M</span>
+<span class="hl"><span class="var">self</span>.one2one_cv2 = <span class="fn">copy.deepcopy</span>(<span class="var">self</span>.cv2)  <span class="cm"># mêmes couches, poids DIFFÉRENTS</span></span>
+<span class="hl"><span class="var">self</span>.one2one_cv3 = <span class="fn">copy.deepcopy</span>(<span class="var">self</span>.cv3)</span>
+
+<span class="var">self</span>.dfl = <span class="fn">nn.Identity</span>()  <span class="cm"># reg_max=1 → pas de DFL</span>
+    </div>
+    <div class="code-block">
+<span class="cm"># loss.py — E2ELoss.__init__()</span>
+<span class="cm"># Deux fonctions de perte avec des TAL DIFFÉRENTS</span>
+<span class="var">self</span>.one2many = <span class="fn">v8DetectionLoss</span>(model, <span class="var">tal_topk</span>=<span class="num">10</span>)
+<span class="var">self</span>.one2one  = <span class="fn">v8DetectionLoss</span>(model, <span class="var">tal_topk</span>=<span class="num">7</span>, <span class="var">tal_topk2</span>=<span class="num">1</span>)
+
+<span class="cm"># ProgLoss — poids initiaux</span>
+<span class="var">self</span>.o2m = <span class="num">0.8</span>         <span class="cm"># début : 80% pour O2M</span>
+<span class="var">self</span>.o2o = <span class="num">0.2</span>         <span class="cm"># début : 20% pour O2O</span>
+<span class="var">self</span>.final_o2m = <span class="num">0.1</span>  <span class="cm"># fin : 10% pour O2M</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi ?</div>
+      <p><strong>deepcopy</strong> : Les deux têtes doivent avoir la même architecture mais des poids indépendants. O2O apprend à ne produire qu'UNE prédiction par objet ; O2M en produit 10. Si elles partageaient les mêmes poids, elles ne pourraient pas avoir des comportements différents.</p>
+      <p style="margin-top:8px"><strong>reg_max=1</strong> : Supprime la DFL. Au lieu de prédire une distribution softmax sur 16 valeurs, le réseau prédit directement 4 distances (l, t, r, b). Simplifie l'export NPU/DSP.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 1 -->
+  <div class="step s-cyan">
+    <div class="step-num">1</div>
+    <h3>Chargement d'un batch de données</h3>
+    <p>Le dataloader charge un batch d'images avec leurs annotations <strong>standard COCO</strong> :</p>
+    <div class="code-block">
+<span class="cm"># Données standard — AUCUNE étiquette spéciale pour NMS-Free</span>
+batch = {
+    <span class="st">"img"</span>: tensor[B, 3, 640, 640],   <span class="cm"># B images RGB redimensionnées</span>
+    <span class="st">"batch_idx"</span>: tensor[N],          <span class="cm"># index image de chaque annotation</span>
+    <span class="st">"cls"</span>: tensor[N, 1],              <span class="cm"># classe de chaque objet (0-79)</span>
+    <span class="st">"bboxes"</span>: tensor[N, 4],           <span class="cm"># boîtes normalisées [x, y, w, h]</span>
+}
+<span class="cm"># Exemple : 16 images, 127 objets annotés au total</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi ?</div>
+      <p>Le NMS-Free ne nécessite AUCUNE modification du dataset. Ce sont des annotations COCO standard (une boîte + une classe par objet). Le "secret" du NMS-Free est dans le label assignment, PAS dans les données.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 2 -->
+  <div class="step s-green">
+    <div class="step-num">2</div>
+    <h3>Forward pass — Backbone + Neck (partagés)</h3>
+    <p>L'image traverse le backbone et le neck, produisant des feature maps multi-échelle :</p>
+    <div class="code-block">
+<span class="cm"># Backbone : extraire des features visuelles à différentes résolutions</span>
+<span class="cm"># Neck (FPN/PAN) : fusionner les features multi-échelle</span>
+
+<span class="cm"># Sortie : 3 niveaux de features</span>
+features = [
+    P3: tensor[B, C, 80, 80],  <span class="cm"># stride=8   → 6400 ancres (détails fins)</span>
+    P4: tensor[B, C, 40, 40],  <span class="cm"># stride=16  → 1600 ancres</span>
+    P5: tensor[B, C, 20, 20],  <span class="cm"># stride=32  →  400 ancres (vue globale)</span>
+]
+<span class="cm"># Total : 8400 ancres par image</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi 3 niveaux ?</div>
+      <p>P3 (80×80) détecte les <strong>petits objets</strong> (piétons éloignés). P4 (40×40) les objets moyens. P5 (20×20) les <strong>grands objets</strong>. Cette hiérarchie est essentielle pour détecter des objets de toutes tailles.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 3 -->
+  <div class="step s-orange">
+    <div class="step-num">3</div>
+    <h3>Forward pass — Tête O2M (one-to-many)</h3>
+    <p>Les features passent par la tête O2M avec les features <strong>normales</strong> (gradient activé) :</p>
+    <div class="code-block">
+<span class="cm"># head.py — Detect.forward()</span>
+<span class="hl-o"><span class="var">preds_o2m</span> = <span class="var">self</span>.<span class="fn">forward_head</span>(x, box_head=<span class="var">self</span>.cv2, cls_head=<span class="var">self</span>.cv3)</span>
+
+<span class="cm"># forward_head() détaillé :</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">3</span>):  <span class="cm"># pour chaque niveau P3, P4, P5</span>
+    boxes_i = <span class="var">self</span>.cv2[i](x[i])  <span class="cm"># Conv→Conv→Conv2d → prédictions de boîtes</span>
+    scores_i = <span class="var">self</span>.cv3[i](x[i]) <span class="cm"># DWConv→Conv→...→Conv2d → scores de classes</span>
+
+<span class="cm"># Résultat O2M :</span>
+preds_o2m = {
+    <span class="st">"boxes"</span>: tensor[B, 4, 8400],   <span class="cm"># 4 coordonnées × 8400 ancres</span>
+    <span class="st">"scores"</span>: tensor[B, 80, 8400], <span class="cm"># 80 scores de classe × 8400 ancres</span>
+    <span class="st">"feats"</span>: [P3, P4, P5],          <span class="cm"># features originales</span>
+}
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi ?</div>
+      <p>La tête O2M utilise les features <strong>avec gradient</strong>. Ses gradients remontent au backbone et au neck. C'est elle qui entraîne principalement le backbone car elle produit un signal dense (10 ancres positives par objet).</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 4 -->
+  <div class="step s-cyan">
+    <div class="step-num">4</div>
+    <h3>Forward pass — DETACH + Tête O2O (one-to-one)</h3>
+    <p>Les features sont <strong>détachées</strong> puis passées à la tête O2O :</p>
+    <div class="code-block">
+<span class="cm"># head.py — Detect.forward() — LIGNE CRUCIALE</span>
+<span class="hl"><span class="var">x_detach</span> = [xi.<span class="fn">detach</span>() <span class="kw">for</span> xi <span class="kw">in</span> x]  <span class="cm"># ← COUPE LE GRADIENT !</span></span>
+
+<span class="var">preds_o2o</span> = <span class="var">self</span>.<span class="fn">forward_head</span>(x_detach, 
+    box_head=<span class="var">self</span>.one2one_cv2, 
+    cls_head=<span class="var">self</span>.one2one_cv3
+)
+
+<span class="cm"># Résultat O2O :</span>
+preds_o2o = {
+    <span class="st">"boxes"</span>: tensor[B, 4, 8400],   <span class="cm"># mêmes dimensions que O2M</span>
+    <span class="st">"scores"</span>: tensor[B, 80, 8400], <span class="cm"># mais poids DIFFÉRENTS</span>
+    <span class="st">"feats"</span>: [P3_detach, P4_detach, P5_detach],
+}
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi detach() ?</div>
+      <p><strong>C'est la ligne la plus importante pour la stabilité de l'entraînement.</strong> Sans detach(), la tête O2O enverrait des gradients au backbone qui CONTREDISENT ceux de O2M. O2M veut activer 10 ancres par objet, O2O veut n'en activer qu'une seule. Ces signaux opposés rendraient l'entraînement du backbone instable et divergent.</p>
+      <p style="margin-top:6px">Avec detach(), seuls les poids de <code>one2one_cv2</code> et <code>one2one_cv3</code> sont mis à jour par la loss O2O. Le backbone est entraîné UNIQUEMENT par O2M.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 5 -->
+  <div class="step s-purple">
+    <div class="step-num">5</div>
+    <h3>Pré-traitement des targets</h3>
+    <p>Les annotations COCO sont converties au format interne :</p>
+    <div class="code-block">
+<span class="cm"># loss.py — v8DetectionLoss.get_assigned_targets_and_loss()</span>
+
+<span class="cm"># 1. Concaténer batch_idx + cls + bboxes</span>
+targets = torch.<span class="fn">cat</span>((batch[<span class="st">"batch_idx"</span>], batch[<span class="st">"cls"</span>], batch[<span class="st">"bboxes"</span>]), <span class="num">1</span>)
+
+<span class="cm"># 2. Convertir xywh → xyxy et mettre à l'échelle de l'image</span>
+targets = <span class="var">self</span>.<span class="fn">preprocess</span>(targets, batch_size, scale=imgsz)
+<span class="cm"># → tensor[B, max_obj, 5] (cls + x1 + y1 + x2 + y2)</span>
+
+<span class="cm"># 3. Séparer labels et boîtes</span>
+gt_labels, gt_bboxes = targets.<span class="fn">split</span>((<span class="num">1</span>, <span class="num">4</span>), dim=<span class="num">2</span>)
+mask_gt = gt_bboxes.<span class="fn">sum</span>(<span class="num">2</span>).<span class="fn">gt_</span>(<span class="num">0.0</span>)  <span class="cm"># masque des GT valides</span>
+
+<span class="cm"># 4. Générer les points d'ancrage</span>
+anchor_points, stride_tensor = <span class="fn">make_anchors</span>(feats, stride, <span class="num">0.5</span>)
+<span class="cm"># anchor_points: tensor[8400, 2] — coordonnée (x,y) de chaque ancre</span>
+<span class="cm"># stride_tensor: tensor[8400, 1] — stride de chaque ancre (8, 16, ou 32)</span>
+
+<span class="cm"># 5. Décoder les boîtes prédites</span>
+pred_bboxes = <span class="var">self</span>.<span class="fn">bbox_decode</span>(anchor_points, pred_distri)
+<span class="cm"># YOLO26 (reg_max=1) : dist2bbox(pred_dist, anchors) directement</span>
+<span class="cm"># PAS de softmax, PAS de DFL — juste anchor ± distance</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi make_anchors() ?</div>
+      <p>Les ancres sont des points sur une grille régulière. Pour une image 640×640 : P3 produit 80×80 = 6400 points espacés de 8px, P4 → 1600 points de 16px, P5 → 400 points de 32px. Total : 8400 points. Chaque point est un candidat potentiel pour prédire un objet.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 6 -->
+  <div class="step s-red">
+    <div class="step-num">6</div>
+    <h3>Label Assignment — TAL (le cœur du NMS-Free)</h3>
+    <p>C'est l'étape la plus critique. Le TAL décide QUELLES ancres sont positives pour QUEL objet. <strong>Voir l'onglet "TAL en Détail" pour l'explication complète.</strong></p>
+    <div class="code-block">
+<span class="cm"># loss.py — Appel du TAL — FAIT SÉPARÉMENT pour O2M et O2O</span>
+
+<span class="cm"># Pour la tête O2M :</span>
+<span class="hl-o">assigner_o2m = <span class="fn">TaskAlignedAssigner</span>(topk=<span class="num">10</span>, alpha=<span class="num">0.5</span>, beta=<span class="num">6.0</span>)</span>
+<span class="cm"># → Assigne jusqu'à 10 ancres par objet</span>
+
+<span class="cm"># Pour la tête O2O :</span>
+<span class="hl">assigner_o2o = <span class="fn">TaskAlignedAssigner</span>(topk=<span class="num">7</span>, topk2=<span class="num">1</span>, alpha=<span class="num">0.5</span>, beta=<span class="num">6.0</span>)</span>
+<span class="cm"># → Pré-sélectionne 7 candidates, puis ne garde que LA MEILLEURE</span>
+
+<span class="cm"># Résultat de chaque assignation :</span>
+_, target_bboxes, target_scores, fg_mask, _ = assigner(
+    pred_scores.<span class="fn">detach</span>().<span class="fn">sigmoid</span>(),  <span class="cm"># scores détachés (pas de gradient ici)</span>
+    pred_bboxes.<span class="fn">detach</span>(),             <span class="cm"># boîtes détachées</span>
+    anchor_points, gt_labels, gt_bboxes, mask_gt
+)
+<span class="cm"># fg_mask: tensor[B, 8400] — True pour les ancres positives</span>
+<span class="cm"># target_scores: tensor[B, 8400, 80] — scores cibles CONTINUS (pas binaires !)</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi topk=7 puis topk2=1 ?</div>
+      <p>Si on mettait directement topk=1, le TAL choisirait la meilleure ancre sur la base d'une seule mesure. Avec topk=7, on explore d'abord 7 candidates par objet, on calcule leurs métriques d'alignement, on résout les conflits (une ancre ne peut servir qu'un seul objet), PUIS on filtre à topk2=1. Cela donne une sélection plus robuste et stable.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 7 -->
+  <div class="step s-green">
+    <div class="step-num">7</div>
+    <h3>Calcul des 3 pertes (pour chaque tête)</h3>
+    <p>Chaque tête (O2M et O2O) calcule indépendamment 3 composantes de perte :</p>
+    <div class="code-block">
+<span class="cm"># loss.py — v8DetectionLoss.get_assigned_targets_and_loss()</span>
+loss = torch.<span class="fn">zeros</span>(<span class="num">3</span>)  <span class="cm"># [box, cls, dfl]</span>
+
+<span class="cm">## ① PERTE DE CLASSIFICATION (BCE)</span>
+<span class="hl-g">loss[<span class="num">1</span>] = <span class="fn">BCE</span>(pred_scores, target_scores) / target_scores_sum</span>
+<span class="cm"># Compare les scores prédits aux scores cibles CONTINUS</span>
+<span class="cm"># target_scores ne sont PAS des {0,1} mais des valeurs dans [0,1]</span>
+<span class="cm"># proportionnelles à la qualité de l'alignement (IoU * score)</span>
+
+<span class="cm">## ② PERTE DE LOCALISATION (CIoU)</span>
+<span class="hl">weight = target_scores.<span class="fn">sum</span>(-<span class="num">1</span>)[fg_mask]  <span class="cm"># poids = qualité du target</span>
+iou = <span class="fn">bbox_iou</span>(pred_bboxes[fg_mask], target_bboxes[fg_mask], CIoU=<span class="kw">True</span>)
+loss[<span class="num">0</span>] = ((<span class="num">1.0</span> - iou) * weight).<span class="fn">sum</span>() / target_scores_sum</span>
+
+<span class="cm">## ③ PERTE DE DISTANCE L1 (remplace DFL dans YOLO26)</span>
+<span class="hl-o"><span class="cm"># YOLO26 (reg_max=1) : pas de DFL → perte L1 normalisée</span>
+target_ltrb = <span class="fn">bbox2dist</span>(anchor_points, target_bboxes)
+<span class="cm"># Normaliser par la taille de l'image</span>
+target_ltrb = target_ltrb * stride / imgsz
+pred_dist = pred_dist * stride / imgsz
+loss[<span class="num">2</span>] = <span class="fn">L1_loss</span>(pred_dist[fg_mask], target_ltrb[fg_mask]) * weight</span>
+
+<span class="cm"># Appliquer les gains des hyperparamètres</span>
+loss[<span class="num">0</span>] *= hyp.box   <span class="cm"># gain box (ex: 7.5)</span>
+loss[<span class="num">1</span>] *= hyp.cls   <span class="cm"># gain cls (ex: 0.5)</span>
+loss[<span class="num">2</span>] *= hyp.dfl   <span class="cm"># gain dfl (ex: 1.5)</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi CIoU et pas L1 pour les boîtes ?</div>
+      <p>CIoU mesure la qualité géométrique globale (chevauchement + distance centres + ratio d'aspect). L1 ne mesure que les erreurs coordonnée par coordonnée sans notion de forme. Les deux sont complémentaires : CIoU pour la qualité spatiale, L1 pour la précision des distances aux bords.</p>
+      <p style="margin-top:6px"><strong>Pourquoi les targets sont continus et pas binaires ?</strong> Une ancre qui chevauche 90% du GT mérite un target de ~0.9, tandis qu'une ancre qui chevauche 30% mérite ~0.3. Cela guide la BCE à pénaliser proportionnellement.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 8 -->
+  <div class="step s-yellow">
+    <div class="step-num">8</div>
+    <h3>ProgLoss — Pondération progressive</h3>
+    <p>Les pertes des deux têtes sont combinées avec des poids qui changent à chaque époque :</p>
+    <div class="code-block">
+<span class="cm"># loss.py — E2ELoss.__call__()</span>
+
+<span class="cm"># Calcul des losses des deux têtes</span>
+loss_o2m = <span class="var">self</span>.one2many.<span class="fn">loss</span>(preds[<span class="st">"one2many"</span>], batch)
+loss_o2o = <span class="var">self</span>.one2one.<span class="fn">loss</span>(preds[<span class="st">"one2one"</span>], batch)
+
+<span class="cm"># ProgLoss : pondération progressive</span>
+<span class="hl">L_total = loss_o2m * <span class="var">self</span>.o2m + loss_o2o * <span class="var">self</span>.o2o</span>
+
+<span class="cm"># À chaque fin d'époque :</span>
+<span class="cm"># loss.py — E2ELoss.update()</span>
+<span class="var">self</span>.updates += <span class="num">1</span>
+<span class="var">self</span>.o2m = <span class="var">self</span>.<span class="fn">decay</span>(<span class="var">self</span>.updates)
+<span class="var">self</span>.o2o = <span class="fn">max</span>(<span class="num">1.0</span> - <span class="var">self</span>.o2m, <span class="num">0</span>)
+
+<span class="cm"># Formule de décroissance linéaire :</span>
+<span class="kw">def</span> <span class="fn">decay</span>(<span class="var">self</span>, x):
+    <span class="kw">return</span> <span class="fn">max</span>(<span class="num">1</span> - x / (epochs - <span class="num">1</span>), <span class="num">0</span>) * (<span class="num">0.8</span> - <span class="num">0.1</span>) + <span class="num">0.1</span>
+    </div>
+
+    <div class="diagram-container">
+      <h4>Évolution des poids ProgLoss — Déplacez le curseur</h4>
+      <input type="range" class="epoch-slider" id="epochSlider" min="0" max="499" value="0" oninput="updateProgLoss()">
+      <div class="metric-cards" id="proglossCards">
+        <div class="metric-card">
+          <div class="value" id="epochVal" style="color:var(--text)">0</div>
+          <div class="label">Époque</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="o2mVal" style="color:var(--orange)">0.800</div>
+          <div class="label">Poids O2M (w_o2m)</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="o2oVal" style="color:var(--cyan)">0.200</div>
+          <div class="label">Poids O2O (w_o2o)</div>
+        </div>
+        <div class="metric-card">
+          <div class="value" id="phaseVal" style="color:var(--green)">Signal dense</div>
+          <div class="label">Phase dominante</div>
+        </div>
+      </div>
+      <canvas id="proglossCanvas" width="700" height="300"></canvas>
+    </div>
+
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi une progression linéaire ?</div>
+      <p><strong>Début (w_o2m=0.8)</strong> : Le modèle ne sait rien. Il a besoin du signal dense de O2M (10 ancres/objet) pour apprendre les features de base du backbone rapidement.</p>
+      <p style="margin-top:4px"><strong>Milieu</strong> : Le backbone est entraîné. On commence à renforcer O2O pour que la tête O2O affine sa sélection unique.</p>
+      <p style="margin-top:4px"><strong>Fin (w_o2m=0.1)</strong> : On veut que le modèle s'aligne au maximum avec son comportement à l'inférence (O2O seule). Le poids O2M reste à 0.1 (pas 0) pour maintenir une régularisation légère.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 9 -->
+  <div class="step s-red">
+    <div class="step-num">9</div>
+    <h3>Backpropagation et mise à jour des poids</h3>
+    <p>Le gradient est calculé et les poids sont mis à jour par MuSGD :</p>
+    <div class="code-block">
+<span class="cm"># Backpropagation</span>
+L_total.<span class="fn">backward</span>()
+
+<span class="cm"># Les gradients circulent DIFFÉREMMENT selon la tête :</span>
+<span class="cm">#</span>
+<span class="cm"># L_o2m → cv2, cv3 → Neck → Backbone     ← GRADIENT COMPLET</span>
+<span class="cm"># L_o2o → one2one_cv2, one2one_cv3 → STOP  ← GRADIENT BLOQUÉ par detach()</span>
+<span class="cm">#</span>
+<span class="cm"># Résultat : le backbone est entraîné UNIQUEMENT par O2M</span>
+<span class="cm"># Les têtes O2O sont entraînées indépendamment</span>
+
+<span class="cm"># MuSGD : mise à jour hybride</span>
+optimizer.<span class="fn">step</span>()
+<span class="cm"># Backbone → SGD + correction Muon (stabilisation)</span>
+<span class="cm"># Têtes → SGD standard (apprentissage rapide)</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi MuSGD ?</div>
+      <p>L'entraînement dual-head est plus instable qu'un entraînement classique. MuSGD ajoute une "correction de courbure" au backbone, inspirée de l'optimisation des LLM (Muon/Kimi K2), qui lisse les oscillations de gradient et accélère la convergence.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- STEP 10 -->
+  <div class="step s-green">
+    <div class="step-num">10</div>
+    <h3>Inférence — Tête O2O uniquement</h3>
+    <p>À l'inférence, la tête O2M est <strong>complètement supprimée</strong>. Seule O2O est utilisée :</p>
+    <div class="code-block">
+<span class="cm"># head.py — Detect.forward() en mode inférence</span>
+<span class="cm"># self.training == False</span>
+
+<span class="cm"># 1. N'utilise QUE la tête O2O</span>
+y = <span class="var">self</span>.<span class="fn">_inference</span>(preds[<span class="st">"one2one"</span>])
+<span class="cm"># → decode boxes + sigmoid(scores)</span>
+
+<span class="cm"># 2. Post-process : top-300 par score (PAS de NMS !)</span>
+<span class="hl">y = <span class="var">self</span>.<span class="fn">postprocess</span>(y)  <span class="cm"># → tensor[B, 300, 6]</span></span>
+<span class="cm"># Format : [x1, y1, x2, y2, score, class_id]</span>
+
+<span class="cm"># postprocess() détaillé :</span>
+boxes, scores = preds.<span class="fn">split</span>([<span class="num">4</span>, <span class="num">80</span>], dim=-<span class="num">1</span>)
+scores, conf, idx = <span class="var">self</span>.<span class="fn">get_topk_index</span>(scores, max_det=<span class="num">300</span>)
+<span class="cm"># → Sélectionne les 300 ancres avec les scores les plus élevés</span>
+<span class="cm"># PAS de NMS, PAS de suppression par IoU, juste un tri par score</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi ça marche sans NMS ?</div>
+      <p>Parce que pendant l'entraînement, la tête O2O a appris (grâce au TAL topk2=1) à n'activer qu'UNE SEULE ancre par objet. Les 8399 autres ancres ont été entraînées à prédire un score FAIBLE. Donc en sélectionnant les top-300, on obtient naturellement ~1 prédiction par objet sans aucun doublon.</p>
+      <p style="margin-top:6px">La méthode <code>fuse()</code> supprime même les couches O2M du modèle : <code>self.cv2 = self.cv3 = None</code></p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 2: TAL EN DÉTAIL ==================== -->
+<div class="section" id="sec1">
+  <h2 class="section-title">Le TaskAlignedAssigner (TAL) — Étape par Étape</h2>
+  <p class="subtitle">L'algorithme qui décide quelle ancre est responsable de quel objet — le cœur du NMS-Free</p>
+
+  <div class="step s-cyan">
+    <div class="step-num">A</div>
+    <h3>Entrée : prédictions + ground truth</h3>
+    <div class="code-block">
+<span class="cm"># tal.py — TaskAlignedAssigner.forward()</span>
+<span class="cm"># Appelé avec @torch.no_grad() — pas de gradient dans le TAL !</span>
+
+pd_scores  <span class="cm"># tensor[B, 8400, 80] — scores de classification (sigmoid)</span>
+pd_bboxes  <span class="cm"># tensor[B, 8400, 4]  — boîtes prédites (xyxy, en pixels)</span>
+anc_points <span class="cm"># tensor[8400, 2]     — centres des ancres (x, y)</span>
+gt_labels  <span class="cm"># tensor[B, M, 1]     — classes ground truth</span>
+gt_bboxes  <span class="cm"># tensor[B, M, 4]     — boîtes ground truth (xyxy)</span>
+mask_gt    <span class="cm"># tensor[B, M, 1]     — masque des GT valides</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <div class="step s-green">
+    <div class="step-num">B</div>
+    <h3>Étape 1 — Filtrage géométrique + STAL</h3>
+    <p>On garde uniquement les ancres dont le centre est <strong>à l'intérieur</strong> d'une boîte GT :</p>
+    <div class="code-block">
+<span class="cm"># tal.py — select_candidates_in_gts()</span>
+
+<span class="cm"># ① STAL : élargir les petites GT</span>
+gt_xywh = <span class="fn">xyxy2xywh</span>(gt_bboxes)
+<span class="hl-g">wh_mask = gt_xywh[..., 2:] < stride[<span class="num">0</span>]  <span class="cm"># objets plus petits que 8px</span>
+gt_xywh[..., 2:] = <span class="fn">where</span>(wh_mask, <span class="num">16</span>, gt_xywh[..., 2:])</span>
+<span class="cm"># → Les objets &lt;8px sont élargis à 16px pour le calcul de candidats</span>
+<span class="cm"># → Garantit des ancres candidates même pour les tout petits objets</span>
+gt_bboxes = <span class="fn">xywh2xyxy</span>(gt_xywh)
+
+<span class="cm"># ② Test d'inclusion : le centre de l'ancre est-il dans la GT ?</span>
+lt, rb = gt_bboxes.<span class="fn">chunk</span>(<span class="num">2</span>)  <span class="cm"># left-top, right-bottom</span>
+deltas = <span class="fn">cat</span>(anc_points - lt, rb - anc_points)
+mask_in_gts = deltas.<span class="fn">amin</span>(-<span class="num">1</span>).<span class="fn">gt_</span>(<span class="num">0</span>)
+<span class="cm"># → tensor[B, M, 8400] — True si l'ancre est dans la GT</span>
+
+<span class="cm"># Résultat : sur 8400 ancres, peut-être 20-50 sont dans la GT box</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi STAL ?</div>
+      <p>Un piéton à 100m vu depuis un drone occupe peut-être 5×10 pixels. Avec stride=8, il n'y a AUCUN centre d'ancre dans une boîte si petite. STAL élargit artificiellement ces boîtes à 16px pour la sélection des candidats (pas pour le calcul de la perte). Sans STAL, ces petits objets n'auraient zéro ancre positive et seraient invisibles à l'entraînement.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <div class="step s-orange">
+    <div class="step-num">C</div>
+    <h3>Étape 2 — Calcul de la métrique d'alignement</h3>
+    <p>Pour chaque paire (ancre candidate, GT), on calcule un score de qualité :</p>
+    <div class="code-block">
+<span class="cm"># tal.py — get_box_metrics()</span>
+
+<span class="cm"># ① Extraire le score de classification pour la classe du GT</span>
+bbox_scores[mask] = pd_scores[batch_idx, :, gt_class][mask]
+<span class="cm"># → Pour chaque ancre, prendre le score de la classe correspondante</span>
+
+<span class="cm"># ② Calculer l'IoU entre la boîte prédite et la GT</span>
+overlaps[mask] = <span class="fn">bbox_iou</span>(gt_boxes, pd_boxes, CIoU=<span class="kw">True</span>)
+
+<span class="cm"># ③ Métrique d'alignement = classification × localisation</span>
+<span class="hl-o">align_metric = bbox_scores<span class="op">^</span><span class="num">0.5</span> * overlaps<span class="op">^</span><span class="num">6.0</span></span>
+<span class="cm"># alpha=0.5 (classification) << beta=6.0 (localisation)</span>
+<span class="cm"># → La LOCALISATION est 12× plus importante que la classification !</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi beta=6 >> alpha=0.5 ?</div>
+      <p>Pour un détecteur NMS-Free, il est <strong>crucial</strong> que l'ancre sélectionnée soit la mieux <strong>localisée</strong>, pas simplement la plus confiante. Pourquoi ? Parce qu'il n'y aura PAS de NMS pour corriger une mauvaise sélection après coup. Si l'ancre choisie a un bon score de classification mais une mauvaise boîte, la détection finale sera mal positionnée et il n'y a aucun mécanisme de rattrapage.</p>
+      <p style="margin-top:6px"><strong>Exemple</strong> : ancre A a score_cls=0.9 et IoU=0.3 → M = 0.9^0.5 × 0.3^6 = 0.95 × 0.0007 = <strong>0.0007</strong>. Ancre B a score_cls=0.5 et IoU=0.8 → M = 0.5^0.5 × 0.8^6 = 0.71 × 0.262 = <strong>0.186</strong>. L'ancre B (mieux localisée) gagne largement.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <div class="step s-purple">
+    <div class="step-num">D</div>
+    <h3>Étape 3 — Sélection top-k</h3>
+    <p>On garde les k meilleures ancres par objet (k dépend de O2M ou O2O) :</p>
+    <div class="code-block">
+<span class="cm"># tal.py — select_topk_candidates()</span>
+
+<span class="cm"># Sélection des top-k par métrique d'alignement</span>
+topk_metrics, topk_idxs = torch.<span class="fn">topk</span>(align_metric, <span class="var">self</span>.topk, dim=-<span class="num">1</span>)
+
+<span class="cm"># Créer un masque binaire des top-k</span>
+count_tensor = torch.<span class="fn">zeros</span>(metrics.shape)
+<span class="kw">for</span> k <span class="kw">in</span> <span class="fn">range</span>(<span class="var">self</span>.topk):
+    count_tensor.<span class="fn">scatter_add_</span>(-<span class="num">1</span>, topk_idxs[:,:,k:k+<span class="num">1</span>], <span class="num">1</span>)
+count_tensor.<span class="fn">masked_fill_</span>(count_tensor > <span class="num">1</span>, <span class="num">0</span>)
+
+<span class="cm"># Masque final = topk ∩ dans_GT ∩ GT_valide</span>
+mask_pos = mask_topk * mask_in_gts * mask_gt
+
+<span class="cm"># Pour O2M (topk=10) : ~10 ancres positives par objet</span>
+<span class="cm"># Pour O2O (topk=7)  : ~7 ancres candidates par objet (pour l'instant)</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <div class="step s-red">
+    <div class="step-num">E</div>
+    <h3>Étape 4 — Résolution des conflits + Filtrage topk2</h3>
+    <p>Si une ancre est assignée à 2 objets différents, on la donne à celui avec le meilleur IoU. Puis pour O2O, on filtre à topk2=1 :</p>
+    <div class="code-block">
+<span class="cm"># tal.py — select_highest_overlaps()</span>
+
+<span class="cm"># ① Détecter les ancres assignées à plusieurs GT</span>
+fg_mask = mask_pos.<span class="fn">sum</span>(dim=<span class="st">"gt_axis"</span>)  <span class="cm"># (B, 8400)</span>
+<span class="kw">if</span> fg_mask.<span class="fn">max</span>() > <span class="num">1</span>:  <span class="cm"># conflit détecté !</span>
+    <span class="cm"># Donner l'ancre au GT avec le meilleur IoU</span>
+    max_overlaps_idx = overlaps.<span class="fn">argmax</span>(dim=<span class="st">"gt_axis"</span>)
+    mask_pos = <span class="fn">where</span>(conflit, garder_meilleur_IoU, mask_pos)
+
+<span class="cm"># ② FILTRAGE topk2 — UNIQUEMENT pour O2O (topk2 ≠ topk)</span>
+<span class="hl"><span class="kw">if</span> <span class="var">self</span>.topk2 != <span class="var">self</span>.topk:  <span class="cm"># O2O: topk=7, topk2=1 → True</span>
+    align_metric = align_metric * mask_pos
+    <span class="cm"># Garder seulement le TOP-1 par GT</span>
+    best_idx = torch.<span class="fn">topk</span>(align_metric, <span class="var">self</span>.topk2, dim=-<span class="num">1</span>).indices
+    topk_idx = torch.<span class="fn">zeros</span>(mask_pos.shape)
+    topk_idx.<span class="fn">scatter_</span>(-<span class="num">1</span>, best_idx, <span class="num">1.0</span>)
+    mask_pos *= topk_idx  <span class="cm"># ← NE GARDE QU'UNE SEULE ANCRE PAR OBJET</span></span>
+
+<span class="cm"># Résultat final :</span>
+<span class="cm"># O2M : ~10 ancres positives par objet → signal dense</span>
+<span class="cm"># O2O : EXACTEMENT 1 ancre positive par objet → NMS-Free</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ C'est ICI que le NMS-Free se produit !</div>
+      <p>Ce bloc <code>if self.topk2 != self.topk</code> est <strong>LE mécanisme</strong> qui rend YOLO26 NMS-Free. En forçant exactement 1 ancre positive par objet pendant l'entraînement, le réseau apprend que chaque objet ne doit activer qu'UN SEUL point de la grille. À l'inférence, il reproduit ce comportement naturellement.</p>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <div class="step s-yellow">
+    <div class="step-num">F</div>
+    <h3>Étape 5 — Normalisation des scores cibles</h3>
+    <p>Les scores cibles sont normalisés pour refléter la qualité de l'assignation :</p>
+    <div class="code-block">
+<span class="cm"># tal.py — _forward() — Normalisation finale</span>
+
+align_metric *= mask_pos
+pos_align = align_metric.<span class="fn">amax</span>(dim=-<span class="num">1</span>)  <span class="cm"># meilleur score par GT</span>
+pos_overlaps = (overlaps * mask_pos).<span class="fn">amax</span>(dim=-<span class="num">1</span>)  <span class="cm"># meilleur IoU par GT</span>
+
+<span class="cm"># Normaliser les métriques</span>
+norm = (align_metric * pos_overlaps / (pos_align + eps)).<span class="fn">amax</span>(dim=<span class="st">"gt_axis"</span>)
+
+<span class="cm"># Appliquer au one-hot score</span>
+<span class="hl-g">target_scores = target_scores * norm</span>
+<span class="cm"># target_scores ∈ [0, 1] — pas binaire !</span>
+<span class="cm"># Une ancre bien alignée (IoU élevé) → target_score ≈ 0.9</span>
+<span class="cm"># Une ancre marginale → target_score ≈ 0.3</span>
+    </div>
+    <div class="why-box">
+      <div class="label">⚡ Pourquoi des targets continus ?</div>
+      <p>Si les targets étaient binaires {0, 1}, la BCE traiterait toutes les ancres positives de la même façon. Avec des targets continus, le réseau apprend à prédire des scores proportionnels à la qualité réelle de chaque ancre. Cela est essentiel pour O2O : l'unique ancre sélectionnée doit avoir un score de confiance qui reflète sa véritable qualité de localisation.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 3: DÉMONSTRATION ==================== -->
+<div class="section" id="sec2">
+  <h2 class="section-title">Démonstration Interactive</h2>
+  <p class="subtitle">Visualisez comment O2M et O2O assignent les ancres différemment pour le même objet</p>
+
+  <div class="step s-cyan">
+    <h3>Scénario : 1 piéton dans une image 640×640</h3>
+    <p>Le piéton est au centre de l'image, avec une boîte de ~64×128 pixels. Voici la grille d'ancres P3 (stride=8, 80×80) zoomée sur la zone du piéton :</p>
+
+    <div class="demo-grid">
+      <div class="demo-panel">
+        <h4 style="color:var(--orange)">Tête O2M — topk=10</h4>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:8px">10 ancres positives (orange) assignées au piéton</p>
+        <div id="gridO2M" class="anchor-grid" style="grid-template-columns:repeat(10,1fr);max-width:300px;"></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Centre GT</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Ancre positive (10)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1a2035"></div>Ancre négative</div>
+        </div>
+      </div>
+      <div class="demo-panel">
+        <h4 style="color:var(--cyan)">Tête O2O — topk=7→topk2=1</h4>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:8px">1 seule ancre positive (cyan) — la mieux localisée</p>
+        <div id="gridO2O" class="anchor-grid" style="grid-template-columns:repeat(10,1fr);max-width:300px;"></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Centre GT</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Ancre positive (1)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1a2035"></div>Ancre négative</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn" onclick="shuffleDemo()">↻ Nouvelle assignation aléatoire</button>
+    </div>
+  </div>
+
+  <div class="step s-orange" style="margin-top:20px">
+    <h3>Démonstration étape par étape du TAL</h3>
+    <p>Cliquez sur chaque étape pour voir ce qui se passe :</p>
+    <div id="demoSteps">
+      <button class="btn" onclick="demoStep(1)" style="margin:4px">Étape 1 : Grille vide</button>
+      <button class="btn btn-orange" onclick="demoStep(2)" style="margin:4px">Étape 2 : Placer la GT</button>
+      <button class="btn" onclick="demoStep(3)" style="margin:4px">Étape 3 : Ancres dans GT</button>
+      <button class="btn btn-orange" onclick="demoStep(4)" style="margin:4px">Étape 4 : Calcul métriques</button>
+      <button class="btn" onclick="demoStep(5)" style="margin:4px">Étape 5 : Top-7 O2O</button>
+      <button class="btn btn-orange" onclick="demoStep(6)" style="margin:4px">Étape 6 : Top-1 final</button>
+    </div>
+    <div id="demoViz" class="diagram-container" style="margin-top:16px;min-height:200px">
+      <div id="demoGrid" class="anchor-grid" style="grid-template-columns:repeat(12,1fr);max-width:420px;margin:0 auto"></div>
+      <p id="demoText" style="margin-top:12px;font-size:13px;color:var(--text2)">Cliquez sur "Étape 1" pour commencer</p>
+    </div>
+  </div>
+
+  <div class="step s-green" style="margin-top:20px">
+    <h3>Comparaison : que voit le réseau à l'inférence ?</h3>
+    <div class="demo-grid">
+      <div class="demo-panel">
+        <h4 style="color:var(--orange)">YOLO11 (avec NMS)</h4>
+        <p style="font-size:12px;color:var(--text2)">Le réseau produit ~10 prédictions pour 1 piéton.<br>NMS supprime les 9 doublons → 1 résultat final.</p>
+        <div style="text-align:center;padding:20px 0">
+          <svg width="200" height="140" viewBox="0 0 200 140">
+            <rect x="60" y="20" width="80" height="100" fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="4"/>
+            <text x="100" y="14" text-anchor="middle" fill="#00ff88" font-size="10" font-family="JetBrains Mono">GT</text>
+            <rect x="55" y="18" width="82" height="105" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.7"/>
+            <rect x="63" y="22" width="78" height="98" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.7"/>
+            <rect x="58" y="15" width="85" height="108" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.7"/>
+            <rect x="65" y="25" width="75" height="95" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.7"/>
+            <rect x="57" y="20" width="84" height="102" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.7"/>
+            <text x="100" y="138" text-anchor="middle" fill="#ff6b35" font-size="10" font-family="JetBrains Mono">~10 boîtes → NMS → 1</text>
+          </svg>
+        </div>
+      </div>
+      <div class="demo-panel">
+        <h4 style="color:var(--cyan)">YOLO26 (NMS-Free)</h4>
+        <p style="font-size:12px;color:var(--text2)">Le réseau produit DIRECTEMENT 1 prédiction pour 1 piéton.<br>Pas de NMS nécessaire → résultat immédiat.</p>
+        <div style="text-align:center;padding:20px 0">
+          <svg width="200" height="140" viewBox="0 0 200 140">
+            <rect x="60" y="20" width="80" height="100" fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="4"/>
+            <text x="100" y="14" text-anchor="middle" fill="#00ff88" font-size="10" font-family="JetBrains Mono">GT</text>
+            <rect x="62" y="21" width="78" height="99" fill="none" stroke="#00d4ff" stroke-width="2.5"/>
+            <text x="100" y="138" text-anchor="middle" fill="#00d4ff" font-size="10" font-family="JetBrains Mono">1 boîte → directe</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 4: RÉSUMÉ POURQUOI ==================== -->
+<div class="section" id="sec3">
+  <h2 class="section-title">Résumé Technique — Répondre à "Pourquoi ?"</h2>
+  <p class="subtitle">Chaque composant justifié, chaque décision expliquée</p>
+
+  <div class="step s-cyan">
+    <h3>La question fondamentale</h3>
+    <p style="font-size:16px;line-height:1.8"><strong>Comment faire pour qu'un réseau de neurones produise exactement 1 prédiction par objet, sans post-traitement ?</strong></p>
+    <p style="margin-top:12px">La réponse tient en une phrase : <strong>on l'entraîne à le faire</strong>. Pendant l'entraînement, on ne récompense qu'UNE SEULE ancre par objet (via le TAL avec topk2=1). Le réseau apprend que toutes les autres ancres doivent prédire un score faible (background). Ainsi, à l'inférence, il ne produit naturellement qu'une seule prédiction forte par objet.</p>
+  </div>
+
+  <div class="table-wrap" style="margin-top:24px">
+    <table>
+      <thead>
+        <tr>
+          <th>Composant</th>
+          <th>Quoi ?</th>
+          <th>Pourquoi ?</th>
+          <th>Sans ce composant ?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag tag-cyan">Tête O2O</span></td>
+          <td>Tête de détection avec assignation 1-vers-1</td>
+          <td>Produit exactement 1 prédiction/objet à l'inférence</td>
+          <td style="color:var(--red)">Impossible d'être NMS-Free. On retombe sur O2M + NMS obligatoire</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-orange">Tête O2M</span></td>
+          <td>Tête auxiliaire avec 10 ancres/objet (entraînement seul)</td>
+          <td>Signal dense pour entraîner le backbone. O2O seul = signal trop faible</td>
+          <td style="color:var(--red)">-2 à -3% mAP. Backbone sous-entraîné, petits objets ratés</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-purple">detach()</span></td>
+          <td>Coupe le gradient entre O2O et le backbone</td>
+          <td>Empêche les gradients contradictoires O2M/O2O au backbone</td>
+          <td style="color:var(--red)">Entraînement instable, oscillations de loss, non-convergence</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-green">TAL topk2=1</span></td>
+          <td>Ne garde que la meilleure ancre par objet pour O2O</td>
+          <td>Force le réseau à n'activer qu'1 point par objet</td>
+          <td style="color:var(--red)">Le réseau active plusieurs ancres → doublons → NMS nécessaire</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-yellow">ProgLoss</span></td>
+          <td>Poids O2M : 0.8→0.1 ; O2O : 0.2→0.9</td>
+          <td>Début : apprendre les features (O2M). Fin : s'aligner sur l'inférence (O2O)</td>
+          <td style="color:var(--red)">Compromis sous-optimal. Le modèle ne s'aligne pas bien avec l'inférence</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-cyan">STAL</span></td>
+          <td>Élargit les GT < 8px à 16px pour la sélection d'ancres</td>
+          <td>Garantit des ancres candidates pour les très petits objets</td>
+          <td style="color:var(--red)">Piétons éloignés = 0 ancre positive → invisibles à l'entraînement</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-orange">Sans DFL</span></td>
+          <td>reg_max=1 → régression directe (pas de softmax)</td>
+          <td>Simplifie l'export NPU/DSP. Pas de softmax → compatible partout</td>
+          <td style="color:var(--yellow)">Modèle fonctionne mais impossible à exporter sur certains edge devices</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-purple">MuSGD</span></td>
+          <td>SGD + correction Muon pour le backbone</td>
+          <td>Stabilise l'entraînement dual-head qui est naturellement plus instable</td>
+          <td style="color:var(--yellow)">Convergence plus lente, instabilité possible sur les gros modèles</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-green">beta=6.0</span></td>
+          <td>La localisation pèse 12× plus que la classification dans TAL</td>
+          <td>Pour O2O, l'ancre choisie DOIT être la mieux localisée (pas de NMS pour corriger)</td>
+          <td style="color:var(--red)">Ancre confiante mais mal placée sélectionnée → détections décalées</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="step s-green" style="margin-top:24px">
+    <h3>La chaîne de causalité complète</h3>
+    <p>Voici le raisonnement "pourquoi ?" de bout en bout :</p>
+    <div class="code-block" style="line-height:2.2">
+<span class="cls">PROBLÈME</span> : NMS est lent, non-parallélisable, et difficile à exporter
+         ↓  <span class="cm">pourquoi ne pas simplement le retirer ?</span>
+<span class="cls">PROBLÈME</span> : Sans NMS, O2M produit ~10 doublons par objet
+         ↓  <span class="cm">pourquoi pas entraîner avec 1 ancre/objet directement ?</span>
+<span class="cls">PROBLÈME</span> : Avec topk=1, signal trop faible → backbone sous-entraîné
+         ↓  <span class="cm">comment avoir un signal dense ET une sortie unique ?</span>
+<span class="cls">SOLUTION</span> : Double tête O2M (dense) + O2O (unique)
+         ↓  <span class="cm">mais les gradients se contredisent...</span>
+<span class="cls">SOLUTION</span> : detach() les features pour O2O
+         ↓  <span class="cm">mais O2M domine au début, O2O n'apprend pas assez...</span>
+<span class="cls">SOLUTION</span> : ProgLoss : augmenter O2O progressivement
+         ↓  <span class="cm">mais comment choisir LA meilleure ancre pour O2O ?</span>
+<span class="cls">SOLUTION</span> : TAL avec topk=7→topk2=1 + beta=6 (favoriser localisation)
+         ↓  <span class="cm">mais les petits objets n'ont pas d'ancres candidates...</span>
+<span class="cls">SOLUTION</span> : STAL élargit les petites GT pour la sélection
+         ↓  <span class="cm">et pour le déploiement edge ?</span>
+<span class="cls">SOLUTION</span> : Supprimer DFL (pas de softmax) + MuSGD pour stabilité
+         ↓
+<span class="cls">RÉSULTAT</span> : YOLO26 NMS-Free ✓
+    </div>
+  </div>
+
+  <div class="step s-purple" style="margin-top:20px">
+    <h3>Ce qu'il faut pour implémenter NMS-Free (résumé pour votre encadrant)</h3>
+    <p>Pour rendre N'IMPORTE QUEL détecteur NMS-Free, il faut :</p>
+    <ul style="margin-top:12px">
+      <li><strong>Un label assigner one-to-one</strong> pendant l'entraînement (TAL topk2=1)</li>
+      <li><strong>Un signal auxiliaire dense</strong> pour compenser le signal faible de O2O (tête O2M + signal dense topk=10)</li>
+      <li><strong>L'isolation des gradients</strong> entre les deux objectifs (detach)</li>
+      <li><strong>Un ordonnancement progressif</strong> des poids (ProgLoss)</li>
+      <li><strong>Un mécanisme pour les petits objets</strong> (STAL ou équivalent)</li>
+      <li><strong>Un assignation qui privilégie la localisation</strong> (beta >> alpha)</li>
+    </ul>
+    <p style="margin-top:12px;color:var(--text)">Sans n'importe lequel de ces éléments, soit le NMS-Free ne fonctionne pas du tout, soit les performances se dégradent significativement.</p>
+  </div>
+</div>
+
+<!-- ==================== TAB 5: CODE SOURCE ==================== -->
+<div class="section" id="sec4">
+  <h2 class="section-title">Code Source de YOLO26 — Commenté en Français</h2>
+  <p class="subtitle">Les 3 fichiers clés avec chaque ligne importante expliquée</p>
+
+  <div class="step s-cyan">
+    <div class="file-tag">ultralytics/nn/modules/head.py</div>
+    <h3>Classe Detect — La tête de détection duale</h3>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">Detect</span>(nn.Module):
+    max_det = <span class="num">300</span>  <span class="cm"># maximum 300 détections par image</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="var">self</span>, nc=<span class="num">80</span>, reg_max=<span class="num">16</span>, end2end=<span class="kw">False</span>, ch=()):
+        <span class="var">self</span>.nc = nc           <span class="cm"># 80 classes (COCO)</span>
+        <span class="var">self</span>.nl = <span class="fn">len</span>(ch)      <span class="cm"># 3 niveaux (P3, P4, P5)</span>
+        <span class="var">self</span>.reg_max = reg_max <span class="cm"># YOLO26: 1 (pas de DFL)</span>
+        <span class="var">self</span>.no = nc + reg_max * <span class="num">4</span>  <span class="cm"># 80 + 4 = 84 sorties/ancre</span>
+
+        <span class="cm"># Tête O2M — régression de boîtes : 3 convolutions par niveau</span>
+        <span class="var">self</span>.cv2 = nn.ModuleList(
+            nn.Sequential(
+                Conv(x, c2, <span class="num">3</span>),          <span class="cm"># Conv 3×3 + BatchNorm + SiLU</span>
+                Conv(c2, c2, <span class="num">3</span>),         <span class="cm"># Conv 3×3 + BatchNorm + SiLU</span>
+                nn.Conv2d(c2, <span class="num">4</span>*reg_max, <span class="num">1</span>)  <span class="cm"># Conv 1×1 → 4 distances (l,t,r,b)</span>
+            ) <span class="kw">for</span> x <span class="kw">in</span> ch  <span class="cm"># pour chaque canal d'entrée des 3 niveaux</span>
+        )
+
+        <span class="cm"># Tête O2M — classification : DWConv (léger) + Conv</span>
+        <span class="var">self</span>.cv3 = nn.ModuleList(
+            nn.Sequential(
+                nn.Sequential(DWConv(x, x, <span class="num">3</span>), Conv(x, c3, <span class="num">1</span>)),
+                nn.Sequential(DWConv(c3, c3, <span class="num">3</span>), Conv(c3, c3, <span class="num">1</span>)),
+                nn.Conv2d(c3, nc, <span class="num">1</span>)  <span class="cm"># → 80 scores de classe (logits)</span>
+            ) <span class="kw">for</span> x <span class="kw">in</span> ch
+        )
+
+        <span class="cm"># DFL désactivée quand reg_max=1</span>
+        <span class="var">self</span>.dfl = DFL(reg_max) <span class="kw">if</span> reg_max > <span class="num">1</span> <span class="kw">else</span> nn.Identity()
+
+        <span class="cm"># Tête O2O — copie profonde indépendante</span>
+        <span class="kw">if</span> end2end:
+<span class="hl">            <span class="var">self</span>.one2one_cv2 = copy.<span class="fn">deepcopy</span>(<span class="var">self</span>.cv2)
+            <span class="var">self</span>.one2one_cv3 = copy.<span class="fn">deepcopy</span>(<span class="var">self</span>.cv3)</span>
+
+    <span class="kw">def</span> <span class="fn">forward</span>(<span class="var">self</span>, x):
+        <span class="cm"># ① Prédictions O2M (features AVEC gradient)</span>
+        preds = <span class="var">self</span>.<span class="fn">forward_head</span>(x, box_head=<span class="var">self</span>.cv2, cls_head=<span class="var">self</span>.cv3)
+
+        <span class="kw">if</span> <span class="var">self</span>.end2end:
+            <span class="cm"># ② DÉTACHER les features (couper le gradient)</span>
+<span class="hl">            x_detach = [xi.<span class="fn">detach</span>() <span class="kw">for</span> xi <span class="kw">in</span> x]</span>
+            <span class="cm"># ③ Prédictions O2O (features SANS gradient)</span>
+            one2one = <span class="var">self</span>.<span class="fn">forward_head</span>(x_detach,
+                box_head=<span class="var">self</span>.one2one_cv2, cls_head=<span class="var">self</span>.one2one_cv3)
+            preds = {<span class="st">"one2many"</span>: preds, <span class="st">"one2one"</span>: one2one}
+
+        <span class="kw">if</span> <span class="var">self</span>.training:
+            <span class="kw">return</span> preds  <span class="cm"># entraînement : retourne les 2</span>
+
+        <span class="cm"># INFÉRENCE : n'utilise QUE O2O</span>
+        y = <span class="var">self</span>.<span class="fn">_inference</span>(preds[<span class="st">"one2one"</span>])
+<span class="hl-g">        y = <span class="var">self</span>.<span class="fn">postprocess</span>(y)  <span class="cm"># top-300, PAS de NMS</span></span>
+        <span class="kw">return</span> y
+
+    <span class="kw">def</span> <span class="fn">postprocess</span>(<span class="var">self</span>, preds):
+        <span class="cm"># Séparer boîtes et scores</span>
+        boxes, scores = preds.<span class="fn">split</span>([<span class="num">4</span>, <span class="var">self</span>.nc], dim=-<span class="num">1</span>)
+        <span class="cm"># Garder les top-300 par score (tri simple, PAS de NMS)</span>
+        scores, conf, idx = <span class="var">self</span>.<span class="fn">get_topk_index</span>(scores, <span class="num">300</span>)
+        boxes = boxes.<span class="fn">gather</span>(<span class="num">1</span>, idx.<span class="fn">repeat</span>(<span class="num">1</span>,<span class="num">1</span>,<span class="num">4</span>))
+        <span class="kw">return</span> torch.<span class="fn">cat</span>([boxes, scores, conf], dim=-<span class="num">1</span>)
+        <span class="cm"># → tensor[B, 300, 6] : x1,y1,x2,y2,score,class</span>
+
+    <span class="kw">def</span> <span class="fn">fuse</span>(<span class="var">self</span>):
+        <span class="cm"># Supprimer la tête O2M pour l'inférence optimisée</span>
+        <span class="var">self</span>.cv2 = <span class="var">self</span>.cv3 = <span class="kw">None</span>
+    </div>
+  </div>
+
+  <div class="step s-green" style="margin-top:20px">
+    <div class="file-tag">ultralytics/utils/tal.py</div>
+    <h3>Classe TaskAlignedAssigner — Le label assignment</h3>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">TaskAlignedAssigner</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="var">self</span>, topk=<span class="num">13</span>, num_classes=<span class="num">80</span>,
+                 alpha=<span class="num">1.0</span>, beta=<span class="num">6.0</span>, stride=[<span class="num">8</span>,<span class="num">16</span>,<span class="num">32</span>],
+                 topk2=<span class="kw">None</span>):
+        <span class="var">self</span>.topk = topk
+        <span class="var">self</span>.topk2 = topk2 <span class="kw">or</span> topk  <span class="cm"># si topk2=None → topk2=topk</span>
+        <span class="var">self</span>.alpha = alpha   <span class="cm"># poids classification (0.5)</span>
+        <span class="var">self</span>.beta = beta     <span class="cm"># poids localisation (6.0)</span>
+        <span class="var">self</span>.stride_val = stride[<span class="num">1</span>]  <span class="cm"># 16 — pour STAL</span>
+
+    @torch.<span class="fn">no_grad</span>()  <span class="cm"># PAS de gradient dans l'assignation !</span>
+    <span class="kw">def</span> <span class="fn">forward</span>(<span class="var">self</span>, pd_scores, pd_bboxes, anc_points,
+                gt_labels, gt_bboxes, mask_gt):
+        <span class="kw">return</span> <span class="var">self</span>.<span class="fn">_forward</span>(...)
+
+    <span class="kw">def</span> <span class="fn">_forward</span>(<span class="var">self</span>, pd_scores, pd_bboxes, anc_points,
+                 gt_labels, gt_bboxes, mask_gt):
+        <span class="cm"># ÉTAPE 1 : filtrage géo + STAL + métrique d'alignement + top-k</span>
+        mask_pos, align_metric, overlaps = <span class="var">self</span>.<span class="fn">get_pos_mask</span>(...)
+
+        <span class="cm"># ÉTAPE 2 : résolution des conflits + filtrage topk2</span>
+        target_gt_idx, fg_mask, mask_pos = \
+            <span class="var">self</span>.<span class="fn">select_highest_overlaps</span>(mask_pos, overlaps, ...)
+
+        <span class="cm"># ÉTAPE 3 : construction des targets</span>
+        target_labels, target_bboxes, target_scores = \
+            <span class="var">self</span>.<span class="fn">get_targets</span>(gt_labels, gt_bboxes, target_gt_idx, fg_mask)
+
+        <span class="cm"># ÉTAPE 4 : normalisation continue des scores</span>
+        align_metric *= mask_pos
+        pos_align = align_metric.<span class="fn">amax</span>(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>)
+        pos_overlaps = (overlaps * mask_pos).<span class="fn">amax</span>(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>)
+        norm = (align_metric * pos_overlaps / (pos_align + eps)).<span class="fn">amax</span>(-<span class="num">2</span>)
+<span class="hl-g">        target_scores = target_scores * norm  <span class="cm"># targets continus [0,1]</span></span>
+
+        <span class="kw">return</span> target_labels, target_bboxes, target_scores, fg_mask, target_gt_idx
+
+    <span class="kw">def</span> <span class="fn">select_candidates_in_gts</span>(<span class="var">self</span>, xy_centers, gt_bboxes, mask_gt):
+        <span class="cm"># STAL : élargir les petites GT</span>
+        gt_xywh = <span class="fn">xyxy2xywh</span>(gt_bboxes)
+<span class="hl">        wh_mask = gt_xywh[..., <span class="num">2</span>:] < <span class="var">self</span>.stride[<span class="num">0</span>]  <span class="cm"># &lt; 8px</span>
+        gt_xywh[..., <span class="num">2</span>:] = <span class="fn">where</span>(wh_mask, <span class="var">self</span>.stride_val, gt_xywh[..., <span class="num">2</span>:])</span>
+        gt_bboxes = <span class="fn">xywh2xyxy</span>(gt_xywh)
+
+        <span class="cm"># Test d'inclusion : centre ancre ∈ GT box ?</span>
+        lt, rb = gt_bboxes.<span class="fn">chunk</span>(<span class="num">2</span>)
+        deltas = <span class="fn">cat</span>(xy_centers - lt, rb - xy_centers)
+        <span class="kw">return</span> deltas.<span class="fn">amin</span>(<span class="num">3</span>).<span class="fn">gt_</span>(<span class="num">0</span>)
+
+    <span class="kw">def</span> <span class="fn">get_box_metrics</span>(<span class="var">self</span>, pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask):
+        <span class="cm"># Score de classification pour la classe du GT</span>
+        bbox_scores[mask] = pd_scores[batch, :, gt_class][mask]
+        <span class="cm"># IoU entre prédiction et GT (CIoU)</span>
+        overlaps[mask] = <span class="fn">bbox_iou</span>(gt_boxes, pd_boxes, CIoU=<span class="kw">True</span>)
+        <span class="cm"># Métrique d'alignement</span>
+<span class="hl-o">        align_metric = bbox_scores<span class="op">**</span><span class="var">self</span>.alpha * overlaps<span class="op">**</span><span class="var">self</span>.beta</span>
+        <span class="kw">return</span> align_metric, overlaps
+
+    <span class="kw">def</span> <span class="fn">select_highest_overlaps</span>(<span class="var">self</span>, mask_pos, overlaps, n_max, align_metric):
+        fg_mask = mask_pos.<span class="fn">sum</span>(-<span class="num">2</span>)
+        <span class="kw">if</span> fg_mask.<span class="fn">max</span>() > <span class="num">1</span>:  <span class="cm"># conflit : 1 ancre → 2 GT</span>
+            <span class="cm"># Garder le GT avec le meilleur IoU</span>
+            mask_pos = <span class="fn">where</span>(conflit, meilleur_IoU, mask_pos)
+
+<span class="hl">        <span class="kw">if</span> <span class="var">self</span>.topk2 != <span class="var">self</span>.topk:  <span class="cm"># O2O uniquement !</span>
+            <span class="cm"># Filtrer de topk=7 à topk2=1</span>
+            best = torch.<span class="fn">topk</span>(align_metric, <span class="var">self</span>.topk2).indices
+            mask_pos *= <span class="fn">scatter</span>(best)  <span class="cm"># 1 SEULE ancre/objet</span></span>
+        <span class="kw">return</span> target_gt_idx, fg_mask, mask_pos
+    </div>
+  </div>
+
+  <div class="step s-orange" style="margin-top:20px">
+    <div class="file-tag">ultralytics/utils/loss.py</div>
+    <h3>Classe E2ELoss — ProgLoss + perte duale</h3>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">E2ELoss</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="var">self</span>, model, loss_fn=v8DetectionLoss):
+<span class="hl-o">        <span class="var">self</span>.one2many = loss_fn(model, tal_topk=<span class="num">10</span>)  <span class="cm"># O2M: 10 ancres/objet</span></span>
+<span class="hl">        <span class="var">self</span>.one2one = loss_fn(model, tal_topk=<span class="num">7</span>, tal_topk2=<span class="num">1</span>)  <span class="cm"># O2O: 1 ancre</span></span>
+        <span class="var">self</span>.o2m = <span class="num">0.8</span>          <span class="cm"># poids initial O2M</span>
+        <span class="var">self</span>.o2o = <span class="num">0.2</span>          <span class="cm"># poids initial O2O</span>
+        <span class="var">self</span>.final_o2m = <span class="num">0.1</span>   <span class="cm"># poids final O2M</span>
+
+    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="var">self</span>, preds, batch):
+        one2many, one2one = preds[<span class="st">"one2many"</span>], preds[<span class="st">"one2one"</span>]
+        loss_o2m = <span class="var">self</span>.one2many.<span class="fn">loss</span>(one2many, batch)
+        loss_o2o = <span class="var">self</span>.one2one.<span class="fn">loss</span>(one2one, batch)
+        <span class="cm"># Loss totale pondérée par ProgLoss</span>
+<span class="hl-g">        <span class="kw">return</span> loss_o2m * <span class="var">self</span>.o2m + loss_o2o * <span class="var">self</span>.o2o</span>
+
+    <span class="kw">def</span> <span class="fn">update</span>(<span class="var">self</span>):  <span class="cm"># appelé à chaque fin d'époque</span>
+        <span class="var">self</span>.updates += <span class="num">1</span>
+        <span class="var">self</span>.o2m = <span class="var">self</span>.<span class="fn">decay</span>(<span class="var">self</span>.updates)
+        <span class="var">self</span>.o2o = <span class="fn">max</span>(<span class="num">1.0</span> - <span class="var">self</span>.o2m, <span class="num">0</span>)
+
+    <span class="kw">def</span> <span class="fn">decay</span>(<span class="var">self</span>, x):
+        <span class="cm"># Décroissance linéaire de 0.8 → 0.1 sur toutes les époques</span>
+        <span class="kw">return</span> <span class="fn">max</span>(<span class="num">1</span> - x / (epochs-<span class="num">1</span>), <span class="num">0</span>) * (<span class="num">0.8</span> - <span class="num">0.1</span>) + <span class="num">0.1</span>
+
+<span class="cm"># ------- v8DetectionLoss (utilisé par chaque tête) -------</span>
+
+<span class="kw">class</span> <span class="cls">v8DetectionLoss</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="var">self</span>, model, tal_topk=<span class="num">10</span>, tal_topk2=<span class="kw">None</span>):
+        <span class="var">self</span>.assigner = <span class="fn">TaskAlignedAssigner</span>(
+            topk=tal_topk, topk2=tal_topk2,
+            alpha=<span class="num">0.5</span>, beta=<span class="num">6.0</span>, stride=[<span class="num">8</span>,<span class="num">16</span>,<span class="num">32</span>])
+        <span class="var">self</span>.bbox_loss = <span class="fn">BboxLoss</span>(reg_max)  <span class="cm"># CIoU + L1</span>
+        <span class="var">self</span>.bce = nn.<span class="fn">BCEWithLogitsLoss</span>()  <span class="cm"># classification</span>
+
+    <span class="kw">def</span> <span class="fn">get_assigned_targets_and_loss</span>(<span class="var">self</span>, preds, batch):
+        <span class="cm"># ① Pré-traiter les annotations</span>
+        targets = <span class="fn">preprocess</span>(batch)
+        gt_labels, gt_bboxes = targets.<span class="fn">split</span>((<span class="num">1</span>, <span class="num">4</span>))
+        
+        <span class="cm"># ② Décoder les boîtes prédites</span>
+        pred_bboxes = <span class="fn">dist2bbox</span>(pred_dist, anchor_points)
+        
+        <span class="cm"># ③ LABEL ASSIGNMENT (TAL)</span>
+        _, target_bboxes, target_scores, fg_mask, _ = <span class="var">self</span>.assigner(
+            pred_scores.<span class="fn">detach</span>().<span class="fn">sigmoid</span>(),  <span class="cm"># détaché !</span>
+            pred_bboxes.<span class="fn">detach</span>(),
+            anchor_points, gt_labels, gt_bboxes, mask_gt)
+        
+        <span class="cm"># ④ PERTE DE CLASSIFICATION (BCE)</span>
+        loss_cls = <span class="fn">BCE</span>(pred_scores, target_scores) / target_scores_sum
+        
+        <span class="cm"># ⑤ PERTE DE LOCALISATION (CIoU)</span>
+        weight = target_scores.<span class="fn">sum</span>(-<span class="num">1</span>)[fg_mask]
+        iou = <span class="fn">bbox_iou</span>(pred[fg_mask], target[fg_mask], CIoU=<span class="kw">True</span>)
+        loss_box = ((<span class="num">1</span> - iou) * weight).<span class="fn">sum</span>() / target_scores_sum
+        
+        <span class="cm"># ⑥ PERTE L1 (remplace DFL quand reg_max=1)</span>
+        target_ltrb = <span class="fn">bbox2dist</span>(anchors, target_bboxes)
+        <span class="cm"># Normaliser par taille image</span>
+        target_ltrb = target_ltrb * stride / imgsz
+        pred_dist = pred_dist * stride / imgsz
+        loss_l1 = <span class="fn">L1</span>(pred_dist[fg_mask], target_ltrb[fg_mask]) * weight
+        
+        <span class="cm"># ⑦ Appliquer les gains hyperparamètres</span>
+        loss_box *= hyp.box   <span class="cm"># ex: 7.5</span>
+        loss_cls *= hyp.cls   <span class="cm"># ex: 0.5</span>
+        loss_l1  *= hyp.dfl   <span class="cm"># ex: 1.5</span>
+        <span class="kw">return</span> loss_box + loss_cls + loss_l1
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 6: SIMULATION COMPLÈTE ==================== -->
+<div class="section" id="sec5">
+  <h2 class="section-title">Simulation Complète — De l'Image au Gradient</h2>
+  <p class="subtitle">Cliquez sur "Étape suivante" pour avancer dans le processus d'entraînement d'UNE itération. Chaque donnée est simulée avec des valeurs réalistes.</p>
+
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:24px;flex-wrap:wrap">
+    <button class="btn" onclick="simReset()" style="background:rgba(255,71,87,0.1);border-color:rgba(255,71,87,0.3);color:var(--red)">↺ Reset</button>
+    <button class="btn" id="simNextBtn" onclick="simNext()">Étape suivante ▶</button>
+    <button class="btn" onclick="simAutoPlay()" id="simAutoBtn" style="background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.3);color:var(--green)">▶▶ Auto-play</button>
+    <span style="font-family:'JetBrains Mono';font-size:13px;color:var(--text3)" id="simStepLabel">Étape 0 / 14</span>
+  </div>
+
+  <div id="simContainer"></div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+// Tab switching
+function showTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.section').forEach((s,i) => s.classList.toggle('active', i===idx));
+  if(idx===0) drawProgLoss();
+  if(idx===2) { initGrids(); shuffleDemo(); }
+  if(idx===5) simReset();
+}
+
+// ProgLoss chart
+function updateProgLoss() {
+  const epoch = parseInt(document.getElementById('epochSlider').value);
+  const epochs = 500;
+  const o2m = Math.max(1 - epoch / (epochs - 1), 0) * (0.8 - 0.1) + 0.1;
+  const o2o = Math.max(1.0 - o2m, 0);
+  document.getElementById('epochVal').textContent = epoch;
+  document.getElementById('o2mVal').textContent = o2m.toFixed(3);
+  document.getElementById('o2oVal').textContent = o2o.toFixed(3);
+  const phase = o2m > o2o ? 'Signal dense (O2M)' : o2m < o2o ? 'Alignement inférence (O2O)' : 'Équilibre';
+  document.getElementById('phaseVal').textContent = phase;
+  document.getElementById('phaseVal').style.color = o2m > o2o ? 'var(--orange)' : o2m < o2o ? 'var(--cyan)' : 'var(--green)';
+  drawProgLoss(epoch);
+}
+
+function drawProgLoss(currentEpoch) {
+  const canvas = document.getElementById('proglossCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth * 2;
+  const H = canvas.height = 600;
+  ctx.scale(1,1);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = {l:80, r:40, t:30, b:50};
+  const gW = W - pad.l - pad.r;
+  const gH = H - pad.t - pad.b;
+
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const y = pad.t + gH * (1 - i/10);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W-pad.r, y); ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '20px JetBrains Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText((i/10).toFixed(1), pad.l - 10, y + 6);
+  }
+  for (let e = 0; e <= 500; e += 100) {
+    const x = pad.l + (e/499) * gW;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + gH); ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    ctx.fillText(e, x, H - 10);
+  }
+
+  function getO2M(e) { return Math.max(1 - e/499, 0) * 0.7 + 0.1; }
+  function getO2O(e) { return Math.max(1.0 - getO2M(e), 0); }
+
+  // O2M line
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 3;
+  for (let e = 0; e < 500; e++) {
+    const x = pad.l + (e/499) * gW;
+    const y = pad.t + gH * (1 - getO2M(e));
+    e === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // O2O line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 3;
+  for (let e = 0; e < 500; e++) {
+    const x = pad.l + (e/499) * gW;
+    const y = pad.t + gH * (1 - getO2O(e));
+    e === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Current epoch marker
+  if (currentEpoch !== undefined) {
+    const cx = pad.l + (currentEpoch/499) * gW;
+    ctx.setLineDash([6,4]);
+    ctx.strokeStyle = '#ffffff44';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, pad.t); ctx.lineTo(cx, pad.t+gH); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const yo2m = pad.t + gH * (1 - getO2M(currentEpoch));
+    const yo2o = pad.t + gH * (1 - getO2O(currentEpoch));
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath(); ctx.arc(cx, yo2m, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath(); ctx.arc(cx, yo2o, 7, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Crossover
+  const crossEpoch = Math.round(499 * (0.8 - 0.5) / 0.7);
+  const crossX = pad.l + (crossEpoch/499) * gW;
+  const crossY = pad.t + gH * 0.5;
+  ctx.fillStyle = '#00ff88';
+  ctx.beginPath(); ctx.arc(crossX, crossY, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#00ff88';
+  ctx.font = '18px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('croisement ≈ ép.' + crossEpoch, crossX, crossY - 14);
+
+  // Labels
+  ctx.font = 'bold 22px JetBrains Mono';
+  ctx.fillStyle = '#ff6b35'; ctx.textAlign = 'left';
+  ctx.fillText('w_o2m (0.8→0.1)', pad.l + 10, pad.t + 30);
+  ctx.fillStyle = '#00d4ff';
+  ctx.fillText('w_o2o (0.2→0.9)', pad.l + 10, pad.t + gH - 10);
+}
+
+// Demo grids
+function initGrids() {
+  ['gridO2M', 'gridO2O'].forEach(id => {
+    const grid = document.getElementById(id);
+    if (grid.children.length > 0) return;
+    for (let i = 0; i < 100; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'anchor-cell bg';
+      grid.appendChild(cell);
+    }
+  });
+}
+
+function shuffleDemo() {
+  initGrids();
+  const gtCenter = 44 + Math.floor(Math.random()*3) - 1;
+  const gtCells = new Set();
+  for (let r = -2; r <= 2; r++) for (let c = -2; c <= 2; c++) {
+    const idx = gtCenter + r*10 + c;
+    if (idx >= 0 && idx < 100) gtCells.add(idx);
+  }
+
+  // O2M: 10 random from gtCells
+  const gtArr = [...gtCells];
+  const o2mPositive = new Set();
+  const shuffled = gtArr.sort(() => Math.random()-0.5);
+  for (let i = 0; i < Math.min(10, shuffled.length); i++) o2mPositive.add(shuffled[i]);
+
+  document.querySelectorAll('#gridO2M .anchor-cell').forEach((c,i) => {
+    c.className = 'anchor-cell ' + (i === gtCenter ? 'gt' : o2mPositive.has(i) ? 'positive-o2m' : 'bg');
+  });
+
+  // O2O: 1 best from gtCells (the center)
+  document.querySelectorAll('#gridO2O .anchor-cell').forEach((c,i) => {
+    c.className = 'anchor-cell ' + (i === gtCenter ? 'positive-o2o' : 'bg');
+  });
+}
+
+// Step-by-step demo
+function demoStep(step) {
+  const grid = document.getElementById('demoGrid');
+  const text = document.getElementById('demoText');
+  grid.innerHTML = '';
+  const cells = 144;
+  for (let i = 0; i < cells; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'anchor-cell bg';
+    cell.style.fontSize = '7px';
+    cell.style.display = 'flex';
+    cell.style.alignItems = 'center';
+    cell.style.justifyContent = 'center';
+    cell.style.color = '#475569';
+    grid.appendChild(cell);
+  }
+
+  const gtBox = [52,53,54,55,64,65,66,67,76,77,78,79,88,89,90,91];
+  const inGT = new Set(gtBox);
+  const metrics = {};
+  gtBox.forEach(i => { metrics[i] = Math.random() * 0.5 + 0.1; });
+  const center = 66;
+  metrics[center] = 0.92;
+  metrics[65] = 0.78; metrics[67] = 0.71;
+  metrics[54] = 0.65; metrics[78] = 0.61;
+  metrics[77] = 0.55; metrics[53] = 0.48;
+  metrics[79] = 0.42;
+
+  const allCells = grid.children;
+
+  if (step === 1) {
+    text.innerHTML = '<strong>Étape 1 :</strong> Grille d\'ancres vide (12×12 = 144 ancres affichées). Chaque cellule = 1 ancre.';
+    for (let i = 0; i < cells; i++) allCells[i].textContent = i;
+  }
+  if (step === 2) {
+    text.innerHTML = '<strong>Étape 2 :</strong> La boîte GT du piéton est placée (cellules vertes). Le piéton occupe ~16 cellules.';
+    gtBox.forEach(i => { allCells[i].className = 'anchor-cell gt'; allCells[i].style.opacity='0.5'; });
+    allCells[center].style.opacity = '1';
+  }
+  if (step === 3) {
+    text.innerHTML = '<strong>Étape 3 — select_candidates_in_gts() :</strong> On vérifie quels centres d\'ancre sont DANS la GT. Les 16 ancres vertes sont des candidates. Les 128 autres sont exclues.';
+    gtBox.forEach(i => { allCells[i].className = 'anchor-cell'; allCells[i].style.background='rgba(0,255,136,0.25)'; allCells[i].style.border='1px solid #00ff88'; });
+  }
+  if (step === 4) {
+    text.innerHTML = '<strong>Étape 4 — get_box_metrics() :</strong> Pour chaque ancre candidate, on calcule M = score^0.5 × IoU^6.0. Les valeurs sont affichées. Le centre (66) a la meilleure métrique car il est le plus proche du centre du GT.';
+    gtBox.forEach(i => {
+      allCells[i].style.background = `rgba(255,107,53,${metrics[i]})`;
+      allCells[i].style.border = '1px solid #ff6b35';
+      allCells[i].textContent = metrics[i].toFixed(2);
+      allCells[i].style.color = '#fff';
+      allCells[i].style.fontSize = '9px';
+      allCells[i].style.fontFamily = 'JetBrains Mono';
+    });
+  }
+  if (step === 5) {
+    const sorted = Object.entries(metrics).sort((a,b)=>b[1]-a[1]);
+    const top7 = new Set(sorted.slice(0,7).map(e=>parseInt(e[0])));
+    text.innerHTML = '<strong>Étape 5 — select_topk_candidates(topk=7) :</strong> On garde les 7 meilleures ancres (bordure bleue). Les 9 autres candidates sont éliminées.';
+    gtBox.forEach(i => {
+      if (top7.has(i)) {
+        allCells[i].style.background = `rgba(0,212,255,0.3)`;
+        allCells[i].style.border = '2px solid #00d4ff';
+        allCells[i].textContent = metrics[i].toFixed(2);
+        allCells[i].style.color = '#00d4ff';
+      } else {
+        allCells[i].style.background = 'rgba(255,255,255,0.03)';
+        allCells[i].style.border = '1px solid #1e293b';
+        allCells[i].textContent = '✗';
+        allCells[i].style.color = '#334155';
+      }
+      allCells[i].style.fontSize = '9px';
+      allCells[i].style.fontFamily = 'JetBrains Mono';
+    });
+  }
+  if (step === 6) {
+    const sorted = Object.entries(metrics).sort((a,b)=>b[1]-a[1]);
+    const top1 = parseInt(sorted[0][0]);
+    text.innerHTML = '<strong>Étape 6 — topk2=1 (select_highest_overlaps) :</strong> De ces 7, on ne garde que LA MEILLEURE (ancre ' + top1 + ' avec M=' + metrics[top1].toFixed(2) + '). <span style="color:#00d4ff;font-weight:700">C\'est cette ancre unique qui sera positive pour l\'entraînement O2O. Voilà comment YOLO26 apprend à ne produire qu\'UNE prédiction par objet.</span>';
+    gtBox.forEach(i => {
+      allCells[i].style.background = 'rgba(255,255,255,0.02)';
+      allCells[i].style.border = '1px solid #1e293b';
+      allCells[i].textContent = '';
+    });
+    allCells[top1].style.background = 'var(--cyan)';
+    allCells[top1].style.border = '2px solid #fff';
+    allCells[top1].textContent = '★';
+    allCells[top1].style.color = '#000';
+    allCells[top1].style.fontSize = '14px';
+    allCells[top1].style.fontWeight = '700';
+  }
+}
+
+// Init
+setTimeout(() => { drawProgLoss(0); }, 100);
+
+// ==================== TAB 6: SIMULATION ENGINE ====================
+let simStep = 0;
+let simAutoInterval = null;
+const SIM = {
+  batchSize: 2,
+  imgSize: 640,
+  numAnchors: 8400,
+  nc: 80,
+  epoch: 42,
+  totalEpochs: 500,
+  objects: [
+    {cls: 0, name:'piéton', bbox:[220,150,280,350], color:'#00ff88'},
+    {cls: 0, name:'piéton', bbox:[400,180,460,370], color:'#fbbf24'},
+    {cls: 2, name:'voiture', bbox:[80,300,250,450], color:'#a855f7'}
+  ]
+};
+
+function simReset() {
+  simStep = 0;
+  if(simAutoInterval) { clearInterval(simAutoInterval); simAutoInterval=null; }
+  document.getElementById('simAutoBtn').textContent = '▶▶ Auto-play';
+  document.getElementById('simContainer').innerHTML = '<div class="step s-cyan"><p style="font-size:15px;text-align:center;padding:40px 0;color:var(--text2)">Cliquez sur <strong>"Étape suivante"</strong> pour démarrer la simulation d\'une itération d\'entraînement complète de YOLO26.</p></div>';
+  document.getElementById('simStepLabel').textContent = 'Étape 0 / 14';
+}
+
+function simAutoPlay() {
+  if (simAutoInterval) {
+    clearInterval(simAutoInterval);
+    simAutoInterval = null;
+    document.getElementById('simAutoBtn').textContent = '▶▶ Auto-play';
+  } else {
+    document.getElementById('simAutoBtn').textContent = '⏸ Pause';
+    simAutoInterval = setInterval(() => {
+      if (simStep >= 14) { clearInterval(simAutoInterval); simAutoInterval=null; document.getElementById('simAutoBtn').textContent = '▶▶ Auto-play'; return; }
+      simNext();
+    }, 2500);
+  }
+}
+
+function simNext() {
+  if (simStep >= 14) return;
+  simStep++;
+  document.getElementById('simStepLabel').textContent = `Étape ${simStep} / 14`;
+  const c = document.getElementById('simContainer');
+
+  const card = document.createElement('div');
+  card.className = 'step ' + simStepColor(simStep);
+  card.style.animation = 'fadeSlideIn 0.4s ease-out';
+  card.innerHTML = simStepContent(simStep);
+  c.appendChild(card);
+
+  if (simStep < 14) {
+    const arrow = document.createElement('div');
+    arrow.className = 'arrow-down';
+    arrow.textContent = '▼';
+    arrow.style.animation = 'fadeSlideIn 0.3s ease-out';
+    c.appendChild(arrow);
+  }
+
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function simStepColor(s) {
+  const colors = ['','s-cyan','s-green','s-orange','s-cyan','s-purple','s-red','s-orange','s-cyan','s-green','s-yellow','s-red','s-purple','s-green','s-cyan'];
+  return colors[s] || 's-cyan';
+}
+
+function simStepContent(s) {
+  const n = `<div class="step-num">${s}</div>`;
+
+  if (s===1) return n+`
+    <h3>Entrée : Image RGB depuis le dataloader</h3>
+    <p>Le dataloader charge 1 image du dataset COCO (batch_size=1 pour simplifier) :</p>
+    <div style="display:flex;gap:20px;align-items:start;flex-wrap:wrap;margin-top:14px">
+      <div style="position:relative;width:280px;height:210px;background:#1a2035;border-radius:8px;border:1px solid var(--border);overflow:hidden">
+        <div style="position:absolute;top:8px;left:8px;font-size:10px;color:var(--text3);font-family:'JetBrains Mono'">Image 640×640 RGB</div>
+        ${SIM.objects.map(o => {
+          const sx=280/640, sy=210/480;
+          return `<div style="position:absolute;left:${o.bbox[0]*sx}px;top:${o.bbox[1]*sy}px;width:${(o.bbox[2]-o.bbox[0])*sx}px;height:${(o.bbox[3]-o.bbox[1])*sy}px;border:2px solid ${o.color};border-radius:3px">
+            <span style="position:absolute;top:-14px;left:0;font-size:9px;color:${o.color};font-family:'JetBrains Mono';background:rgba(0,0,0,0.7);padding:0 4px;border-radius:2px">${o.name}</span>
+          </div>`;
+        }).join('')}
+        <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(0deg,#2a3a5e 0%,transparent 100%)"></div>
+        <div style="position:absolute;bottom:8px;left:8px;right:8px;height:20px;background:#3a4a6e;border-radius:3px"></div>
+      </div>
+      <div>
+        <div class="code-block" style="margin-top:0;font-size:11px">
+<span class="cm"># Annotations COCO standard</span>
+batch = {
+  <span class="st">"img"</span>: tensor[<span class="num">1</span>, <span class="num">3</span>, <span class="num">640</span>, <span class="num">640</span>],
+  <span class="st">"cls"</span>: [<span class="num">0</span>, <span class="num">0</span>, <span class="num">2</span>],  <span class="cm"># piéton, piéton, voiture</span>
+  <span class="st">"bboxes"</span>: [
+    [<span class="num">220</span>,<span class="num">150</span>,<span class="num">280</span>,<span class="num">350</span>],  <span class="cm"># piéton 1</span>
+    [<span class="num">400</span>,<span class="num">180</span>,<span class="num">460</span>,<span class="num">370</span>],  <span class="cm"># piéton 2</span>
+    [<span class="num">80</span>,<span class="num">300</span>,<span class="num">250</span>,<span class="num">450</span>],   <span class="cm"># voiture</span>
+  ]
+}
+<span class="cm"># 3 objets — données STANDARD, rien de spécial</span>
+        </div>
+      </div>
+    </div>`;
+
+  if (s===2) return n+`
+    <h3>Backbone — Extraction de features multi-échelle</h3>
+    <p>L'image passe par le backbone (CSPDarknet) qui extrait des features visuelles à 3 résolutions :</p>
+    <div style="display:flex;gap:12px;align-items:end;justify-content:center;margin:20px 0;flex-wrap:wrap">
+      <div style="text-align:center">
+        <div style="width:160px;height:160px;background:linear-gradient(135deg,#1a3a2a,#0a2a1a);border:2px solid var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-size:11px;flex-direction:column;gap:4px">
+          <span style="color:var(--green);font-weight:700">P3</span>
+          <span style="color:var(--text2)">80 × 80</span>
+          <span style="color:var(--text3);font-size:10px">stride = 8</span>
+          <span style="color:var(--green);font-size:10px;font-weight:600">6 400 ancres</span>
+        </div>
+        <p style="font-size:10px;color:var(--text3);margin-top:6px">Petits objets</p>
+      </div>
+      <div style="text-align:center">
+        <div style="width:120px;height:120px;background:linear-gradient(135deg,#2a2a1a,#1a1a0a);border:2px solid var(--yellow);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-size:11px;flex-direction:column;gap:4px">
+          <span style="color:var(--yellow);font-weight:700">P4</span>
+          <span style="color:var(--text2)">40 × 40</span>
+          <span style="color:var(--text3);font-size:10px">stride = 16</span>
+          <span style="color:var(--yellow);font-size:10px;font-weight:600">1 600 ancres</span>
+        </div>
+        <p style="font-size:10px;color:var(--text3);margin-top:6px">Objets moyens</p>
+      </div>
+      <div style="text-align:center">
+        <div style="width:80px;height:80px;background:linear-gradient(135deg,#2a1a2a,#1a0a1a);border:2px solid var(--purple);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-size:11px;flex-direction:column;gap:4px">
+          <span style="color:var(--purple);font-weight:700">P5</span>
+          <span style="color:var(--text2)">20 × 20</span>
+          <span style="color:var(--text3);font-size:10px">stride=32</span>
+          <span style="color:var(--purple);font-size:10px;font-weight:600">400</span>
+        </div>
+        <p style="font-size:10px;color:var(--text3);margin-top:6px">Grands objets</p>
+      </div>
+    </div>
+    <div style="text-align:center;font-family:'JetBrains Mono';font-size:13px;color:var(--text)">Total : <span style="color:var(--cyan);font-weight:700">6400 + 1600 + 400 = 8 400 ancres</span></div>
+    <div class="why-box"><div class="label">⚡ Ce qui se passe</div><p>Le backbone transforme les pixels RGB en "features" — des représentations numériques abstraites qui capturent les contours, textures et formes. Chaque niveau voit l'image à une échelle différente.</p></div>`;
+
+  if (s===3) return n+`
+    <h3>Tête O2M — Forward pass (features AVEC gradient)</h3>
+    <p>Les 3 niveaux de features passent par la tête <span class="tag tag-orange">O2M</span> :</p>
+    <div class="code-block" style="font-size:11px">
+<span class="cm"># Pour chaque niveau P3, P4, P5 :</span>
+boxes_P3 = cv2[<span class="num">0</span>](P3)  <span class="cm"># Conv→Conv→Conv2d → tensor[1, 4, 6400]</span>
+boxes_P4 = cv2[<span class="num">1</span>](P4)  <span class="cm"># Conv→Conv→Conv2d → tensor[1, 4, 1600]</span>
+boxes_P5 = cv2[<span class="num">2</span>](P5)  <span class="cm"># Conv→Conv→Conv2d → tensor[1, 4, 400]</span>
+
+scores_P3 = cv3[<span class="num">0</span>](P3) <span class="cm"># DWConv→Conv→...→Conv2d → tensor[1, 80, 6400]</span>
+scores_P4 = cv3[<span class="num">1</span>](P4) <span class="cm"># tensor[1, 80, 1600]</span>
+scores_P5 = cv3[<span class="num">2</span>](P5) <span class="cm"># tensor[1, 80, 400]</span>
+
+<span class="cm"># Concaténer les 3 niveaux</span>
+<span class="hl-o">preds_o2m.boxes  = cat([boxes_P3, boxes_P4, boxes_P5])   <span class="cm"># → [1, 4, 8400]</span>
+preds_o2m.scores = cat([scores_P3, scores_P4, scores_P5]) <span class="cm"># → [1, 80, 8400]</span></span>
+    </div>
+    <div class="metric-cards">
+      <div class="metric-card"><div class="value" style="color:var(--orange);font-size:20px">[1, 4, 8400]</div><div class="label">Boîtes O2M</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--orange);font-size:20px">[1, 80, 8400]</div><div class="label">Scores O2M</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--orange);font-size:20px">✓ gradient</div><div class="label">Backprop vers backbone</div></div>
+    </div>`;
+
+  if (s===4) return n+`
+    <h3>detach() + Tête O2O — Forward pass (features SANS gradient)</h3>
+    <p>Les features sont <strong style="color:var(--red)">détachées</strong> puis passées à la tête <span class="tag tag-cyan">O2O</span> :</p>
+    <div class="code-block" style="font-size:11px">
+<span class="hl"><span class="cm"># LIGNE CRUCIALE — coupe le gradient vers le backbone</span>
+P3_det, P4_det, P5_det = P3.<span class="fn">detach</span>(), P4.<span class="fn">detach</span>(), P5.<span class="fn">detach</span>()</span>
+
+<span class="cm"># Mêmes opérations mais avec des poids INDÉPENDANTS</span>
+boxes_P3 = one2one_cv2[<span class="num">0</span>](P3_det)  <span class="cm"># poids différents de cv2 !</span>
+scores_P3 = one2one_cv3[<span class="num">0</span>](P3_det) <span class="cm"># poids différents de cv3 !</span>
+<span class="cm">...</span>
+
+<span class="hl">preds_o2o.boxes  = cat([...])  <span class="cm"># → [1, 4, 8400]</span>
+preds_o2o.scores = cat([...])  <span class="cm"># → [1, 80, 8400]</span></span>
+    </div>
+    <div class="metric-cards">
+      <div class="metric-card"><div class="value" style="color:var(--cyan);font-size:20px">[1, 4, 8400]</div><div class="label">Boîtes O2O</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--cyan);font-size:20px">[1, 80, 8400]</div><div class="label">Scores O2O</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--red);font-size:20px">✗ pas de gradient</div><div class="label">Backbone isolé</div></div>
+    </div>`;
+
+  if (s===5) return n+`
+    <h3>Pré-traitement des annotations</h3>
+    <p>Convertir les 3 annotations COCO au format interne du TAL :</p>
+    <div class="code-block" style="font-size:11px">
+<span class="cm"># Concaténer et convertir xywh → xyxy</span>
+gt_labels = tensor[[<span class="num">0</span>], [<span class="num">0</span>], [<span class="num">2</span>]]  <span class="cm"># classes : piéton, piéton, voiture</span>
+gt_bboxes = tensor[
+  [<span class="num">220</span>, <span class="num">150</span>, <span class="num">280</span>, <span class="num">350</span>],  <span class="cm"># piéton 1 (60×200 px)</span>
+  [<span class="num">400</span>, <span class="num">180</span>, <span class="num">460</span>, <span class="num">370</span>],  <span class="cm"># piéton 2 (60×190 px)</span>
+  [<span class="num"> 80</span>, <span class="num">300</span>, <span class="num">250</span>, <span class="num">450</span>],  <span class="cm"># voiture  (170×150 px)</span>
+]
+mask_gt = [<span class="kw">True</span>, <span class="kw">True</span>, <span class="kw">True</span>]  <span class="cm"># 3 GT valides</span>
+
+<span class="cm"># Générer les 8400 points d'ancrage</span>
+anchor_points = <span class="fn">make_anchors</span>([P3, P4, P5], [<span class="num">8</span>,<span class="num">16</span>,<span class="num">32</span>])
+<span class="cm"># → tensor[8400, 2] — coordonnées (x,y) de chaque ancre</span>
+
+<span class="cm"># Décoder les boîtes prédites : ancre ± distance</span>
+pred_bboxes = <span class="fn">dist2bbox</span>(pred_dist, anchor_points)
+<span class="cm"># → tensor[1, 8400, 4] — boîtes prédites en xyxy</span>
+    </div>`;
+
+  if (s===6) return n+`
+    <h3>TAL pour O2M — Assignation de 10 ancres par objet</h3>
+    <p>Le TaskAlignedAssigner avec <span class="tag tag-orange">topk=10</span> s'exécute :</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Objet</th><th>Ancres dans GT</th><th>Top-10 sélectionnées</th><th>Meilleur M</th></tr></thead>
+      <tbody>
+        <tr><td><span style="color:#00ff88">Piéton 1</span></td><td>~47 ancres (P3: 40, P4: 7)</td><td style="color:var(--orange);font-weight:600">10 ancres positives</td><td style="font-family:'JetBrains Mono';color:var(--orange)">M=0.87</td></tr>
+        <tr><td><span style="color:#fbbf24">Piéton 2</span></td><td>~44 ancres (P3: 38, P4: 6)</td><td style="color:var(--orange);font-weight:600">10 ancres positives</td><td style="font-family:'JetBrains Mono';color:var(--orange)">M=0.82</td></tr>
+        <tr><td><span style="color:#a855f7">Voiture</span></td><td>~85 ancres (P3: 60, P4: 20, P5: 5)</td><td style="color:var(--orange);font-weight:600">10 ancres positives</td><td style="font-family:'JetBrains Mono';color:var(--orange)">M=0.91</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="metric-cards" style="margin-top:12px">
+      <div class="metric-card"><div class="value" style="color:var(--orange)">30</div><div class="label">Ancres positives O2M</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--text3)">8 370</div><div class="label">Ancres négatives</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--orange)">0.36%</div><div class="label">Ratio positif/total</div></div>
+    </div>`;
+
+  if (s===7) return n+`
+    <h3>TAL pour O2O — Assignation de 1 SEULE ancre par objet</h3>
+    <p>Le TaskAlignedAssigner avec <span class="tag tag-cyan">topk=7, topk2=1</span> s'exécute :</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Objet</th><th>Top-7 candidates</th><th style="color:var(--cyan)">Top-1 finale</th><th>Métrique M</th><th>Position ancre</th></tr></thead>
+      <tbody>
+        <tr><td><span style="color:#00ff88">Piéton 1</span></td><td>7 meilleures sur ~47</td><td style="color:var(--cyan);font-weight:700">★ 1 seule</td><td style="font-family:'JetBrains Mono';color:var(--cyan)">M=0.87</td><td style="font-family:'JetBrains Mono';font-size:11px">P3, pos=(31, 31), stride=8</td></tr>
+        <tr><td><span style="color:#fbbf24">Piéton 2</span></td><td>7 meilleures sur ~44</td><td style="color:var(--cyan);font-weight:700">★ 1 seule</td><td style="font-family:'JetBrains Mono';color:var(--cyan)">M=0.82</td><td style="font-family:'JetBrains Mono';font-size:11px">P3, pos=(54, 34), stride=8</td></tr>
+        <tr><td><span style="color:#a855f7">Voiture</span></td><td>7 meilleures sur ~85</td><td style="color:var(--cyan);font-weight:700">★ 1 seule</td><td style="font-family:'JetBrains Mono';color:var(--cyan)">M=0.91</td><td style="font-family:'JetBrains Mono';font-size:11px">P3, pos=(21, 47), stride=8</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="metric-cards" style="margin-top:12px">
+      <div class="metric-card"><div class="value" style="color:var(--cyan)">3</div><div class="label">Ancres positives O2O</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--text3)">8 397</div><div class="label">Ancres négatives</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--cyan)">0.036%</div><div class="label">Ratio — 10× plus faible !</div></div>
+    </div>
+    <div class="why-box"><div class="label">⚡ Point clé</div><p>O2M assigne <strong>30 ancres positives</strong> (signal riche). O2O assigne <strong>3 ancres positives</strong> (1 par objet). C'est pourquoi O2M est nécessaire pour entraîner le backbone — O2O seul donnerait un signal 10× trop faible.</p></div>`;
+
+  if (s===8) return n+`
+    <h3>Calcul des pertes — Tête O2M</h3>
+    <p>3 composantes de perte calculées sur les 30 ancres positives :</p>
+    <div class="metric-cards">
+      <div class="metric-card" style="border-left:3px solid var(--green)"><div class="value" style="color:var(--green);font-size:22px">L_box = 1.82</div><div class="label">Perte CIoU (localisation)</div></div>
+      <div class="metric-card" style="border-left:3px solid var(--purple)"><div class="value" style="color:var(--purple);font-size:22px">L_cls = 0.94</div><div class="label">Perte BCE (classification)</div></div>
+      <div class="metric-card" style="border-left:3px solid var(--yellow)"><div class="value" style="color:var(--yellow);font-size:22px">L_l1 = 0.67</div><div class="label">Perte L1 (distances)</div></div>
+    </div>
+    <div class="code-block" style="font-size:11px">
+<span class="cm"># Appliquer les gains hyperparamètres</span>
+L_box = <span class="num">1.82</span> × hyp.box(<span class="num">7.5</span>) = <span class="num">13.65</span>
+L_cls = <span class="num">0.94</span> × hyp.cls(<span class="num">0.5</span>) = <span class="num">0.47</span>
+L_l1  = <span class="num">0.67</span> × hyp.dfl(<span class="num">1.5</span>) = <span class="num">1.01</span>
+
+<span class="hl-o">L_o2m = <span class="num">13.65</span> + <span class="num">0.47</span> + <span class="num">1.01</span> = <span class="num">15.13</span></span>
+    </div>`;
+
+  if (s===9) return n+`
+    <h3>Calcul des pertes — Tête O2O</h3>
+    <p>3 composantes de perte calculées sur les <strong>3 seules</strong> ancres positives :</p>
+    <div class="metric-cards">
+      <div class="metric-card" style="border-left:3px solid var(--green)"><div class="value" style="color:var(--green);font-size:22px">L_box = 1.54</div><div class="label">Perte CIoU</div></div>
+      <div class="metric-card" style="border-left:3px solid var(--purple)"><div class="value" style="color:var(--purple);font-size:22px">L_cls = 0.88</div><div class="label">Perte BCE</div></div>
+      <div class="metric-card" style="border-left:3px solid var(--yellow)"><div class="value" style="color:var(--yellow);font-size:22px">L_l1 = 0.59</div><div class="label">Perte L1</div></div>
+    </div>
+    <div class="code-block" style="font-size:11px">
+L_box = <span class="num">1.54</span> × <span class="num">7.5</span> = <span class="num">11.55</span>
+L_cls = <span class="num">0.88</span> × <span class="num">0.5</span> = <span class="num">0.44</span>
+L_l1  = <span class="num">0.59</span> × <span class="num">1.5</span> = <span class="num">0.89</span>
+
+<span class="hl">L_o2o = <span class="num">11.55</span> + <span class="num">0.44</span> + <span class="num">0.89</span> = <span class="num">12.88</span></span>
+    </div>
+    <div class="why-box"><div class="label">⚡ Observation</div><p>L_o2o est légèrement inférieure à L_o2m car les ancres sélectionnées par O2O sont les MEILLEURES (topk2=1 → meilleur alignement). Les prédictions sur ces ancres sont de meilleure qualité que la moyenne des 10 ancres O2M.</p></div>`;
+
+  if (s===10) {
+    const e = SIM.epoch;
+    const o2m = Math.max(1 - e/(SIM.totalEpochs-1), 0) * 0.7 + 0.1;
+    const o2o = Math.max(1.0 - o2m, 0);
+    const lt = 15.13 * o2m + 12.88 * o2o;
+    return n+`
+    <h3>ProgLoss — Pondération à l'époque ${e}/${SIM.totalEpochs}</h3>
+    <p>Les deux pertes sont combinées avec les poids ProgLoss de l'époque actuelle :</p>
+    <div class="metric-cards">
+      <div class="metric-card"><div class="value" style="color:var(--orange)">${o2m.toFixed(3)}</div><div class="label">w_o2m (époque ${e})</div></div>
+      <div class="metric-card"><div class="value" style="color:var(--cyan)">${o2o.toFixed(3)}</div><div class="label">w_o2o (époque ${e})</div></div>
+    </div>
+    <div class="code-block" style="font-size:12px;margin-top:12px">
+<span class="hl-g">L_total = L_o2m × w_o2m + L_o2o × w_o2o
+L_total = <span class="num">15.13</span> × <span class="num">${o2m.toFixed(3)}</span> + <span class="num">12.88</span> × <span class="num">${o2o.toFixed(3)}</span>
+<span style="color:var(--green);font-weight:700">L_total = ${lt.toFixed(2)}</span></span>
+    </div>
+    <p style="margin-top:12px;font-size:13px;color:var(--text2)">À l'époque ${e}, le poids O2M (${o2m.toFixed(3)}) est encore dominant. Le backbone apprend principalement du signal dense O2M.</p>`;
+  }
+
+  if (s===11) return n+`
+    <h3>Backpropagation — Les gradients circulent</h3>
+    <p>La loss totale est différentiée. Les gradients circulent <strong>différemment</strong> selon le chemin :</p>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:20px;margin:16px 0;font-family:'JetBrains Mono';font-size:12px;line-height:2.2;overflow-x:auto">
+      <div style="color:var(--orange)">L_o2m</div>
+      <div style="color:var(--text3);padding-left:20px">↓ gradient</div>
+      <div style="color:var(--orange);padding-left:20px">cv2, cv3 (tête O2M)</div>
+      <div style="color:var(--text3);padding-left:40px">↓ gradient</div>
+      <div style="color:var(--orange);padding-left:40px">Neck (FPN/PAN)</div>
+      <div style="color:var(--text3);padding-left:60px">↓ gradient</div>
+      <div style="color:var(--orange);padding-left:60px;font-weight:700">Backbone ✓ MIS À JOUR</div>
+      <br>
+      <div style="color:var(--cyan)">L_o2o</div>
+      <div style="color:var(--text3);padding-left:20px">↓ gradient</div>
+      <div style="color:var(--cyan);padding-left:20px">one2one_cv2, one2one_cv3 (tête O2O)</div>
+      <div style="color:var(--red);padding-left:40px;font-weight:700">✗ BLOQUÉ par detach() — le backbone ne reçoit RIEN de O2O</div>
+    </div>
+    <div class="why-box"><div class="label">⚡ Conséquence directe</div><p>Le backbone est entraîné UNIQUEMENT par le signal dense O2M (30 ancres positives). La tête O2O est entraînée indépendamment pour apprendre à sélectionner l'unique meilleure ancre. Pas de conflit de gradients.</p></div>`;
+
+  if (s===12) return n+`
+    <h3>MuSGD — Mise à jour des poids</h3>
+    <p>L'optimiseur met à jour tous les paramètres du réseau :</p>
+    <div class="code-block" style="font-size:11px">
+<span class="cm"># MuSGD : mise à jour hybride</span>
+optimizer.<span class="fn">step</span>()
+
+<span class="cm"># Le backbone reçoit : SGD + correction Muon</span>
+<span class="hl-o"><span class="var">θ</span>_backbone -= lr × (grad_o2m + <span class="var">γ</span> × Δ_muon)</span>
+<span class="cm"># → La correction Muon lisse les oscillations et stabilise</span>
+
+<span class="cm"># Les têtes reçoivent : SGD standard</span>
+<span class="var">θ</span>_cv2     -= lr × grad_o2m  <span class="cm"># tête O2M box</span>
+<span class="var">θ</span>_cv3     -= lr × grad_o2m  <span class="cm"># tête O2M cls</span>
+<span class="hl"><span class="var">θ</span>_o2o_cv2 -= lr × grad_o2o  <span class="cm"># tête O2O box (gradient indépendant)</span>
+<span class="var">θ</span>_o2o_cv3 -= lr × grad_o2o  <span class="cm"># tête O2O cls (gradient indépendant)</span></span>
+
+optimizer.<span class="fn">zero_grad</span>()  <span class="cm"># remettre les gradients à zéro</span>
+    </div>`;
+
+  if (s===13) return n+`
+    <h3>Fin d'époque — ProgLoss update</h3>
+    <p>À la fin de chaque époque, les poids ProgLoss sont mis à jour :</p>
+    <div class="code-block" style="font-size:11px">
+<span class="cm"># loss.py — E2ELoss.update()</span>
+<span class="var">self</span>.updates += <span class="num">1</span>  <span class="cm"># époque 42 → 43</span>
+<span class="var">self</span>.o2m = <span class="fn">decay</span>(<span class="num">43</span>)
+<span class="cm"># = max(1 - 43/499, 0) × (0.8 - 0.1) + 0.1</span>
+<span class="cm"># = 0.914 × 0.7 + 0.1 = 0.740</span>
+<span class="var">self</span>.o2o = <span class="fn">max</span>(<span class="num">1.0</span> - <span class="num">0.740</span>, <span class="num">0</span>) = <span class="num">0.260</span>
+
+<span class="cm"># Le poids O2M diminue légèrement : 0.741 → 0.740</span>
+<span class="cm"># Le poids O2O augmente légèrement : 0.259 → 0.260</span>
+<span class="cm"># → Transition TRÈS progressive vers O2O</span>
+    </div>
+    <p style="margin-top:12px;font-size:13px;color:var(--text2)">Ce cycle se répète pour les 500 époques. À chaque itération, les poids se déplacent lentement vers O2O.</p>`;
+
+  if (s===14) return n+`
+    <h3 style="color:var(--cyan)">✓ Itération terminée — Résumé de ce qui s'est passé</h3>
+    <p style="font-size:14px;line-height:1.8;margin-bottom:16px">En UNE seule itération d'entraînement, voici tout ce qui s'est produit :</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Étape</th><th>Résultat</th><th>Rôle NMS-Free</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Chargement image + annotations</td><td>640×640 RGB + 3 objets GT</td><td>Données standard, rien de spécial</td></tr>
+        <tr><td>2</td><td>Backbone</td><td>3 niveaux features → 8400 ancres</td><td>Partagé entre O2M et O2O</td></tr>
+        <tr><td>3</td><td>Tête O2M (avec gradient)</td><td>8400 prédictions (boxes + scores)</td><td>Signal dense pour le backbone</td></tr>
+        <tr><td>4</td><td><strong style="color:var(--red)">detach()</strong> + Tête O2O</td><td>8400 prédictions indépendantes</td><td>Isolation des gradients</td></tr>
+        <tr><td>5</td><td>Pré-traitement targets</td><td>3 GT → format TAL</td><td>—</td></tr>
+        <tr><td>6</td><td>TAL O2M (topk=10)</td><td><span style="color:var(--orange)">30 ancres positives</span></td><td>Signal riche pour le backbone</td></tr>
+        <tr><td>7</td><td><strong style="color:var(--cyan)">TAL O2O (topk2=1)</strong></td><td><span style="color:var(--cyan)">3 ancres positives</span></td><td><strong>LE mécanisme NMS-Free</strong></td></tr>
+        <tr><td>8</td><td>Loss O2M</td><td>L_o2m = 15.13</td><td>CIoU + BCE + L1</td></tr>
+        <tr><td>9</td><td>Loss O2O</td><td>L_o2o = 12.88</td><td>CIoU + BCE + L1</td></tr>
+        <tr><td>10</td><td>ProgLoss</td><td>L_total = w×L_o2m + w×L_o2o</td><td>Transition progressive O2M→O2O</td></tr>
+        <tr><td>11</td><td>Backpropagation</td><td>Gradients → backbone (O2M seul)</td><td>detach() bloque O2O→backbone</td></tr>
+        <tr><td>12</td><td>MuSGD</td><td>Mise à jour des poids</td><td>Stabilisation du backbone</td></tr>
+        <tr><td>13</td><td>ProgLoss update</td><td>w_o2m ↓, w_o2o ↑</td><td>Transition vers l'inférence</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="why-box" style="margin-top:16px;background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.15)">
+      <div class="label" style="color:var(--green)">✓ Conclusion</div>
+      <p style="font-size:14px"><strong>Après 500 époques de ce processus</strong>, la tête O2O a appris à n'activer qu'UNE seule ancre par objet. À l'inférence, on supprime la tête O2M (fuse()), et la tête O2O produit directement des résultats sans aucun NMS. Pas de données spéciales, pas de NMS caché — juste un label assignment intelligent (topk2=1) combiné à un signal auxiliaire dense (O2M).</p>
+    </div>`;
+
+  return '';
+}
+
+// CSS animation for simulation
+const simStyle = document.createElement('style');
+simStyle.textContent = `@keyframes fadeSlideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`;
+document.head.appendChild(simStyle);
+</script>
+</body>
+</html>
