@@ -1,329 +1,1137 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YOLO26 — Pipeline d'Entraînement Interactif</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--card:#131c30;--cyan:#06d6f2;--orange:#ff7043;--green:#22d68a;--purple:#a78bfa;--red:#f4516c;--yellow:#fbbf24;--text:#e8ecf4;--text2:#94a3b8;--text3:#4b5972;--border:#1e2d48}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:auto}
-::selection{background:rgba(6,214,242,.25)}
-::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLO26 — Pipeline d'Entraînement Interactif</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --bg2: #111827;
+      --bg3: #1a2235;
+      --card: #131c30;
+      --cyan: #06d6f2;
+      --orange: #ff7043;
+      --green: #22d68a;
+      --purple: #a78bfa;
+      --red: #f4516c;
+      --yellow: #fbbf24;
+      --pink: #f472b6;
+      --text: #e8ecf4;
+      --text2: #94a3b8;
+      --text3: #4b5972;
+      --border: #1e2d48
+    }
 
-.top-line{height:3px;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--orange),var(--green));position:fixed;top:0;left:0;right:0;z-index:200}
-header{text-align:center;padding:2rem 1rem 1rem;background:radial-gradient(ellipse at 50% 0%,rgba(6,214,242,.05),transparent 60%)}
-header h1{font-size:clamp(1.2rem,3vw,2rem);font-weight:800;background:linear-gradient(135deg,var(--cyan),#fff 50%,var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-header p{color:var(--text2);font-size:.82rem;margin-top:.4rem}
-.tags{display:flex;justify-content:center;gap:.4rem;margin-top:.7rem;flex-wrap:wrap}
-.tag{padding:2px 10px;border-radius:20px;font-size:.65rem;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid}
-.t1{color:var(--cyan);border-color:rgba(6,214,242,.3);background:rgba(6,214,242,.07)}
-.t2{color:var(--orange);border-color:rgba(255,112,67,.3);background:rgba(255,112,67,.07)}
-.t3{color:var(--green);border-color:rgba(34,214,138,.3);background:rgba(34,214,138,.07)}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
 
-/* ── FLOWCHART CANVAS ── */
-.canvas-wrap{position:relative;width:100%;overflow:auto;padding:1.5rem}
-.canvas{position:relative;width:1500px;height:820px;margin:0 auto}
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      overflow-x: auto
+    }
 
-/* SVG arrows layer */
-.canvas svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
-.canvas svg line,.canvas svg path,.canvas svg polyline{stroke-width:2;fill:none}
-.canvas svg .arr-gray{stroke:#2d3a54}
-.canvas svg .arr-orange{stroke:var(--orange)}
-.canvas svg .arr-cyan{stroke:var(--cyan)}
-.canvas svg .arr-green{stroke:var(--green)}
-.canvas svg .arr-purple{stroke:var(--purple)}
-.canvas svg .arr-red{stroke:var(--red)}
-.canvas svg .arr-yellow{stroke:var(--yellow)}
-.canvas svg .dashed{stroke-dasharray:6 4}
-.canvas svg .animated{stroke-dasharray:8 5;animation:flowDash 1s linear infinite}
-@keyframes flowDash{to{stroke-dashoffset:-13}}
-.canvas svg marker polygon{fill:inherit}
+    ::selection {
+      background: rgba(6, 214, 242, .25)
+    }
 
-/* ── NODES ── */
-.node{position:absolute;z-index:10;cursor:pointer;border-radius:14px;padding:12px 16px;text-align:center;border:1.5px solid var(--border);background:var(--card);transition:all .25s;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:130px}
-.node:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.4)}
-.node.active{border-width:2px;transform:translateY(-3px)}
-.node .icon{font-size:1.6rem;margin-bottom:4px}
-.node .label{font-size:.78rem;font-weight:700;line-height:1.2}
-.node .sub{font-size:.62rem;color:var(--text3);margin-top:2px;font-family:'JetBrains Mono',monospace;line-height:1.3}
-.node .badge{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:6px;font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;border:1.5px solid}
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px
+    }
 
-/* Node color themes */
-.n-data{border-color:rgba(148,163,184,.3)}.n-data:hover,.n-data.active{border-color:var(--text2);box-shadow:0 0 25px rgba(148,163,184,.15)}.n-data .badge{background:var(--bg);color:var(--text2);border-color:var(--text2)}
-.n-back{border-color:rgba(167,139,250,.3)}.n-back:hover,.n-back.active{border-color:var(--purple);box-shadow:0 0 25px rgba(167,139,250,.2)}.n-back .label{color:var(--purple)}.n-back .badge{background:var(--bg);color:var(--purple);border-color:var(--purple)}
-.n-o2m{border-color:rgba(255,112,67,.3);background:rgba(255,112,67,.04)}.n-o2m:hover,.n-o2m.active{border-color:var(--orange);box-shadow:0 0 25px rgba(255,112,67,.2)}.n-o2m .label{color:var(--orange)}.n-o2m .badge{background:var(--bg);color:var(--orange);border-color:var(--orange)}
-.n-det{border-color:rgba(34,214,138,.3);background:rgba(34,214,138,.04)}.n-det:hover,.n-det.active{border-color:var(--green);box-shadow:0 0 25px rgba(34,214,138,.2)}.n-det .label{color:var(--green)}.n-det .badge{background:var(--bg);color:var(--green);border-color:var(--green)}
-.n-o2o{border-color:rgba(6,214,242,.3);background:rgba(6,214,242,.04)}.n-o2o:hover,.n-o2o.active{border-color:var(--cyan);box-shadow:0 0 25px rgba(6,214,242,.2)}.n-o2o .label{color:var(--cyan)}.n-o2o .badge{background:var(--bg);color:var(--cyan);border-color:var(--cyan)}
-.n-tal{border-color:rgba(251,191,36,.3)}.n-tal:hover,.n-tal.active{border-color:var(--yellow);box-shadow:0 0 25px rgba(251,191,36,.2)}.n-tal .label{color:var(--yellow)}.n-tal .badge{background:var(--bg);color:var(--yellow);border-color:var(--yellow)}
-.n-loss{border-color:rgba(244,81,108,.3);background:rgba(244,81,108,.04)}.n-loss:hover,.n-loss.active{border-color:var(--red);box-shadow:0 0 25px rgba(244,81,108,.2)}.n-loss .label{color:var(--red)}.n-loss .badge{background:var(--bg);color:var(--red);border-color:var(--red)}
-.n-prog{border-color:rgba(34,214,138,.3);background:rgba(34,214,138,.06);border-style:dashed}.n-prog:hover,.n-prog.active{border-color:var(--green);border-style:solid;box-shadow:0 0 30px rgba(34,214,138,.2)}.n-prog .label{color:var(--green)}.n-prog .badge{background:var(--bg);color:var(--green);border-color:var(--green)}
-.n-optim{border-color:rgba(167,139,250,.3)}.n-optim:hover,.n-optim.active{border-color:var(--purple);box-shadow:0 0 25px rgba(167,139,250,.2)}.n-optim .label{color:var(--purple)}.n-optim .badge{background:var(--bg);color:var(--purple);border-color:var(--purple)}
-.n-infer{border-color:rgba(6,214,242,.4);background:rgba(6,214,242,.06);border-width:2px}.n-infer:hover,.n-infer.active{border-color:var(--cyan);box-shadow:0 0 35px rgba(6,214,242,.25)}.n-infer .label{color:var(--cyan)}.n-infer .badge{background:var(--bg);color:var(--cyan);border-color:var(--cyan)}
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px
+    }
 
-/* Split point */
-.split-dot{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--green);z-index:15;box-shadow:0 0 12px rgba(34,214,138,.5);cursor:default}
+    .top-line {
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange), var(--green));
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200
+    }
 
-/* Phase labels on the canvas */
-.phase-tag{position:absolute;z-index:5;font-size:.58rem;font-family:'JetBrains Mono',monospace;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border-radius:5px;pointer-events:none}
+    header {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      background: radial-gradient(ellipse at 50% 0%, rgba(6, 214, 242, .05), transparent 60%)
+    }
 
-/* ── MODAL ── */
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(5,8,18,.75);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:fadeIn .2s ease}
-.modal-overlay.show{display:flex}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:18px;width:min(680px,92vw);max-height:85vh;overflow-y:auto;padding:2rem;position:relative;animation:modalIn .3s ease}
-@keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-.modal-close{position:absolute;top:1rem;right:1rem;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text2);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:10}
-.modal-close:hover{border-color:var(--red);color:var(--red);background:rgba(244,81,108,.08)}
-.modal .m-header{display:flex;align-items:center;gap:.8rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);padding-right:2rem}
-.modal .m-icon{font-size:2rem}
-.modal .m-title{font-size:1.2rem;font-weight:800}
-.modal .m-step{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--text3)}
+    header h1 {
+      font-size: clamp(1.2rem, 3vw, 2rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--cyan), #fff 50%, var(--orange));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent
+    }
 
-.qa{margin-bottom:1.2rem;padding:1.1rem;border-radius:12px;border:1px solid var(--border);background:var(--card)}
-.qa-label{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:.67rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:.6rem;padding:2px 9px;border-radius:5px}
-.q-why .qa-label{color:var(--orange);background:rgba(255,112,67,.1)}
-.q-what .qa-label{color:var(--cyan);background:rgba(6,214,242,.1)}
-.q-how .qa-label{color:var(--green);background:rgba(34,214,138,.1)}
-.qa p,.qa ul{font-size:.8rem;color:var(--text2);line-height:1.7}
-.qa ul{padding-left:1.1rem;margin-top:.3rem}
-.qa li{margin-bottom:.25rem}
-.qa code{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:rgba(6,214,242,.08);color:var(--cyan);padding:1px 6px;border-radius:4px}
-.qa .fm{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;margin-top:.5rem;line-height:1.8;color:var(--text2);overflow-x:auto;white-space:pre-wrap}
-.fm .hc{color:var(--cyan)}.fm .ho{color:var(--orange)}.fm .hg{color:var(--green)}.fm .hp{color:var(--purple)}
-.qa .analogy{font-style:italic;color:var(--purple);padding:.4rem .7rem;border-left:3px solid var(--purple);margin-top:.5rem;font-size:.78rem;background:rgba(167,139,250,.04);border-radius:0 6px 6px 0}
-.qa .keybox{margin-top:.7rem;padding:.7rem .9rem;border-radius:8px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2)}
-.qa .keybox-title{font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700;color:var(--yellow);letter-spacing:1px;text-transform:uppercase;margin-bottom:.4rem}
-.qa .keybox ul{font-size:.78rem;margin:0;padding-left:1rem}
-.qa .keybox li{color:var(--text);margin-bottom:.2rem}
-.q-ana .qa-label{color:var(--purple);background:rgba(167,139,250,.1)}
-.qa .def{display:inline;border-bottom:1px dotted var(--text3);cursor:help}
-.qa .note{font-size:.75rem;color:var(--text3);margin-top:.4rem;font-style:italic}
+    header p {
+      color: var(--text2);
+      font-size: .82rem;
+      margin-top: .4rem
+    }
 
-/* Navigation arrows in modal */
-.modal-nav{display:flex;justify-content:space-between;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)}
-.modal-nav button{background:var(--bg);border:1px solid var(--border);color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:.5rem 1rem;border-radius:8px;cursor:pointer;transition:all .2s}
-.modal-nav button:hover{border-color:var(--cyan);color:var(--cyan)}
-.modal-nav button:disabled{opacity:.3;cursor:default;border-color:var(--border);color:var(--text3)}
+    .tags {
+      display: flex;
+      justify-content: center;
+      gap: .4rem;
+      margin-top: .7rem;
+      flex-wrap: wrap
+    }
 
-/* Instruction bar */
-.hint{text-align:center;padding:.5rem;font-size:.72rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
-.hint span{color:var(--cyan)}
+    .tag {
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: .65rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      border: 1px solid
+    }
 
-footer{text-align:center;padding:1rem;font-size:.65rem;color:var(--text3);font-family:'JetBrains Mono',monospace;border-top:1px solid var(--border)}
-</style>
+    .t1 {
+      color: var(--cyan);
+      border-color: rgba(6, 214, 242, .3);
+      background: rgba(6, 214, 242, .07)
+    }
+
+    .t2 {
+      color: var(--orange);
+      border-color: rgba(255, 112, 67, .3);
+      background: rgba(255, 112, 67, .07)
+    }
+
+    .t3 {
+      color: var(--green);
+      border-color: rgba(34, 214, 138, .3);
+      background: rgba(34, 214, 138, .07)
+    }
+
+    /* ── FLOWCHART CANVAS ── */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      overflow: auto;
+      padding: 1.5rem
+    }
+
+    .canvas {
+      position: relative;
+      width: 1500px;
+      height: 820px;
+      margin: 0 auto
+    }
+
+    /* SVG arrows layer */
+    .canvas svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1
+    }
+
+    .canvas svg line,
+    .canvas svg path,
+    .canvas svg polyline {
+      stroke-width: 2;
+      fill: none
+    }
+
+    .canvas svg .arr-gray {
+      stroke: #2d3a54
+    }
+
+    .canvas svg .arr-orange {
+      stroke: var(--orange)
+    }
+
+    .canvas svg .arr-cyan {
+      stroke: var(--cyan)
+    }
+
+    .canvas svg .arr-green {
+      stroke: var(--green)
+    }
+
+    .canvas svg .arr-purple {
+      stroke: var(--purple)
+    }
+
+    .canvas svg .arr-red {
+      stroke: var(--red)
+    }
+
+    .canvas svg .arr-yellow {
+      stroke: var(--yellow)
+    }
+
+    .canvas svg .dashed {
+      stroke-dasharray: 6 4
+    }
+
+    .canvas svg .animated {
+      stroke-dasharray: 8 5;
+      animation: flowDash 1s linear infinite
+    }
+
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -13
+      }
+    }
+
+    .canvas svg marker polygon {
+      fill: inherit
+    }
+
+    /* ── NODES ── */
+    .node {
+      position: absolute;
+      z-index: 10;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 12px 16px;
+      text-align: center;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      transition: all .25s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 130px
+    }
+
+    .node:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .4)
+    }
+
+    .node.active {
+      border-width: 2px;
+      transform: translateY(-3px)
+    }
+
+    .node .icon {
+      font-size: 1.6rem;
+      margin-bottom: 4px
+    }
+
+    .node .label {
+      font-size: .78rem;
+      font-weight: 700;
+      line-height: 1.2
+    }
+
+    .node .sub {
+      font-size: .62rem;
+      color: var(--text3);
+      margin-top: 2px;
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.3
+    }
+
+    .node .badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      font-size: .6rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      border: 1.5px solid
+    }
+
+    /* Node color themes */
+    .n-data {
+      border-color: rgba(148, 163, 184, .3)
+    }
+
+    .n-data:hover,
+    .n-data.active {
+      border-color: var(--text2);
+      box-shadow: 0 0 25px rgba(148, 163, 184, .15)
+    }
+
+    .n-data .badge {
+      background: var(--bg);
+      color: var(--text2);
+      border-color: var(--text2)
+    }
+
+    .n-back {
+      border-color: rgba(167, 139, 250, .3)
+    }
+
+    .n-back:hover,
+    .n-back.active {
+      border-color: var(--purple);
+      box-shadow: 0 0 25px rgba(167, 139, 250, .2)
+    }
+
+    .n-back .label {
+      color: var(--purple)
+    }
+
+    .n-back .badge {
+      background: var(--bg);
+      color: var(--purple);
+      border-color: var(--purple)
+    }
+
+    .n-o2m {
+      border-color: rgba(255, 112, 67, .3);
+      background: rgba(255, 112, 67, .04)
+    }
+
+    .n-o2m:hover,
+    .n-o2m.active {
+      border-color: var(--orange);
+      box-shadow: 0 0 25px rgba(255, 112, 67, .2)
+    }
+
+    .n-o2m .label {
+      color: var(--orange)
+    }
+
+    .n-o2m .badge {
+      background: var(--bg);
+      color: var(--orange);
+      border-color: var(--orange)
+    }
+
+    .n-det {
+      border-color: rgba(34, 214, 138, .3);
+      background: rgba(34, 214, 138, .04)
+    }
+
+    .n-det:hover,
+    .n-det.active {
+      border-color: var(--green);
+      box-shadow: 0 0 25px rgba(34, 214, 138, .2)
+    }
+
+    .n-det .label {
+      color: var(--green)
+    }
+
+    .n-det .badge {
+      background: var(--bg);
+      color: var(--green);
+      border-color: var(--green)
+    }
+
+    .n-o2o {
+      border-color: rgba(6, 214, 242, .3);
+      background: rgba(6, 214, 242, .04)
+    }
+
+    .n-o2o:hover,
+    .n-o2o.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(6, 214, 242, .2)
+    }
+
+    .n-o2o .label {
+      color: var(--cyan)
+    }
+
+    .n-o2o .badge {
+      background: var(--bg);
+      color: var(--cyan);
+      border-color: var(--cyan)
+    }
+
+    .n-tal {
+      border-color: rgba(251, 191, 36, .3)
+    }
+
+    .n-tal:hover,
+    .n-tal.active {
+      border-color: var(--yellow);
+      box-shadow: 0 0 25px rgba(251, 191, 36, .2)
+    }
+
+    .n-tal .label {
+      color: var(--yellow)
+    }
+
+    .n-tal .badge {
+      background: var(--bg);
+      color: var(--yellow);
+      border-color: var(--yellow)
+    }
+
+    .n-loss {
+      border-color: rgba(244, 81, 108, .3);
+      background: rgba(244, 81, 108, .04)
+    }
+
+    .n-loss:hover,
+    .n-loss.active {
+      border-color: var(--red);
+      box-shadow: 0 0 25px rgba(244, 81, 108, .2)
+    }
+
+    .n-loss .label {
+      color: var(--red)
+    }
+
+    .n-loss .badge {
+      background: var(--bg);
+      color: var(--red);
+      border-color: var(--red)
+    }
+
+    .n-prog {
+      border-color: rgba(34, 214, 138, .3);
+      background: rgba(34, 214, 138, .06);
+      border-style: dashed
+    }
+
+    .n-prog:hover,
+    .n-prog.active {
+      border-color: var(--green);
+      border-style: solid;
+      box-shadow: 0 0 30px rgba(34, 214, 138, .2)
+    }
+
+    .n-prog .label {
+      color: var(--green)
+    }
+
+    .n-prog .badge {
+      background: var(--bg);
+      color: var(--green);
+      border-color: var(--green)
+    }
+
+    .n-optim {
+      border-color: rgba(167, 139, 250, .3)
+    }
+
+    .n-optim:hover,
+    .n-optim.active {
+      border-color: var(--purple);
+      box-shadow: 0 0 25px rgba(167, 139, 250, .2)
+    }
+
+    .n-optim .label {
+      color: var(--purple)
+    }
+
+    .n-optim .badge {
+      background: var(--bg);
+      color: var(--purple);
+      border-color: var(--purple)
+    }
+
+    .n-infer {
+      border-color: rgba(6, 214, 242, .4);
+      background: rgba(6, 214, 242, .06);
+      border-width: 2px
+    }
+
+    .n-infer:hover,
+    .n-infer.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 35px rgba(6, 214, 242, .25)
+    }
+
+    .n-infer .label {
+      color: var(--cyan)
+    }
+
+    .n-infer .badge {
+      background: var(--bg);
+      color: var(--cyan);
+      border-color: var(--cyan)
+    }
+
+    .n-stal {
+      border-color: rgba(244, 114, 182, .3);
+      background: rgba(244, 114, 182, .05)
+    }
+
+    .n-stal:hover,
+    .n-stal.active {
+      border-color: var(--pink);
+      box-shadow: 0 0 28px rgba(244, 114, 182, .2)
+    }
+
+    .n-stal .label {
+      color: var(--pink)
+    }
+
+    .n-stal .badge {
+      background: var(--bg);
+      color: var(--pink);
+      border-color: var(--pink)
+    }
+
+    /* Split point */
+    .split-dot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--green);
+      z-index: 15;
+      box-shadow: 0 0 12px rgba(34, 214, 138, .5);
+      cursor: default
+    }
+
+    /* Phase labels on the canvas */
+    .phase-tag {
+      position: absolute;
+      z-index: 5;
+      font-size: .58rem;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 5px;
+      pointer-events: none
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(5, 8, 18, .75);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+      animation: fadeIn .2s ease
+    }
+
+    .modal-overlay.show {
+      display: flex
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      width: min(680px, 92vw);
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 2rem;
+      position: relative;
+      animation: modalIn .3s ease
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(.97)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1)
+      }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text2);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+      z-index: 10
+    }
+
+    .modal-close:hover {
+      border-color: var(--red);
+      color: var(--red);
+      background: rgba(244, 81, 108, .08)
+    }
+
+    .modal .m-header {
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-right: 2rem
+    }
+
+    .modal .m-icon {
+      font-size: 2rem
+    }
+
+    .modal .m-title {
+      font-size: 1.2rem;
+      font-weight: 800
+    }
+
+    .modal .m-step {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem;
+      color: var(--text3)
+    }
+
+    .qa {
+      margin-bottom: 1.2rem;
+      padding: 1.1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card)
+    }
+
+    .qa-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .67rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: .6rem;
+      padding: 2px 9px;
+      border-radius: 5px
+    }
+
+    .q-why .qa-label {
+      color: var(--orange);
+      background: rgba(255, 112, 67, .1)
+    }
+
+    .q-what .qa-label {
+      color: var(--cyan);
+      background: rgba(6, 214, 242, .1)
+    }
+
+    .q-how .qa-label {
+      color: var(--green);
+      background: rgba(34, 214, 138, .1)
+    }
+
+    .qa p,
+    .qa ul {
+      font-size: .8rem;
+      color: var(--text2);
+      line-height: 1.7
+    }
+
+    .qa ul {
+      padding-left: 1.1rem;
+      margin-top: .3rem
+    }
+
+    .qa li {
+      margin-bottom: .25rem
+    }
+
+    .qa code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .72rem;
+      background: rgba(6, 214, 242, .08);
+      color: var(--cyan);
+      padding: 1px 6px;
+      border-radius: 4px
+    }
+
+    .qa .fm {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .72rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .7rem .9rem;
+      margin-top: .5rem;
+      line-height: 1.8;
+      color: var(--text2);
+      overflow-x: auto;
+      white-space: pre-wrap
+    }
+
+    .fm .hc {
+      color: var(--cyan)
+    }
+
+    .fm .ho {
+      color: var(--orange)
+    }
+
+    .fm .hg {
+      color: var(--green)
+    }
+
+    .fm .hp {
+      color: var(--purple)
+    }
+
+    .qa .analogy {
+      font-style: italic;
+      color: var(--purple);
+      padding: .4rem .7rem;
+      border-left: 3px solid var(--purple);
+      margin-top: .5rem;
+      font-size: .78rem;
+      background: rgba(167, 139, 250, .04);
+      border-radius: 0 6px 6px 0
+    }
+
+    .qa .keybox {
+      margin-top: .7rem;
+      padding: .7rem .9rem;
+      border-radius: 8px;
+      background: rgba(251, 191, 36, .06);
+      border: 1px solid rgba(251, 191, 36, .2)
+    }
+
+    .qa .keybox-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--yellow);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: .4rem
+    }
+
+    .qa .keybox ul {
+      font-size: .78rem;
+      margin: 0;
+      padding-left: 1rem
+    }
+
+    .qa .keybox li {
+      color: var(--text);
+      margin-bottom: .2rem
+    }
+
+    .q-ana .qa-label {
+      color: var(--purple);
+      background: rgba(167, 139, 250, .1)
+    }
+
+    .qa .def {
+      display: inline;
+      border-bottom: 1px dotted var(--text3);
+      cursor: help
+    }
+
+    .qa .note {
+      font-size: .75rem;
+      color: var(--text3);
+      margin-top: .4rem;
+      font-style: italic
+    }
+
+    /* Navigation arrows in modal */
+    .modal-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border)
+    }
+
+    .modal-nav button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .72rem;
+      padding: .5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s
+    }
+
+    .modal-nav button:hover {
+      border-color: var(--cyan);
+      color: var(--cyan)
+    }
+
+    .modal-nav button:disabled {
+      opacity: .3;
+      cursor: default;
+      border-color: var(--border);
+      color: var(--text3)
+    }
+
+    /* Instruction bar */
+    .hint {
+      text-align: center;
+      padding: .5rem;
+      font-size: .72rem;
+      color: var(--text3);
+      font-family: 'JetBrains Mono', monospace
+    }
+
+    .hint span {
+      color: var(--cyan)
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: .65rem;
+      color: var(--text3);
+      font-family: 'JetBrains Mono', monospace;
+      border-top: 1px solid var(--border)
+    }
+  </style>
 </head>
+
 <body>
-<div class="top-line"></div>
-<header>
-<h1>YOLO26 — Pipeline d'Entraînement</h1>
-<p>Cliquez sur chaque nœud du schéma pour explorer : <strong>Pourquoi</strong> · <strong>À quoi sert</strong> · <strong>Comment</strong></p>
-<div class="tags"><span class="tag t1">NMS-FREE</span><span class="tag t2">DUAL HEAD</span><span class="tag t3">PROGLOSS</span></div>
-</header>
+  <div class="top-line"></div>
+  <header>
+    <h1>YOLO26 — Pipeline d'Entraînement</h1>
+    <p>Cliquez sur chaque nœud du schéma pour explorer : <strong>Pourquoi</strong> · <strong>À quoi sert</strong> ·
+      <strong>Comment</strong>
+    </p>
+    <div class="tags"><span class="tag t1">NMS-FREE</span><span class="tag t2">DUAL HEAD</span><span
+        class="tag t3">PROGLOSS</span><span class="tag"
+        style="color:var(--pink);border-color:rgba(244,114,182,.3);background:rgba(244,114,182,.07)">STAL</span></div>
+  </header>
 
-<div class="hint">👆 Cliquez sur un nœud du diagramme — <span>Échap</span> pour fermer</div>
+  <div class="hint">👆 Cliquez sur un nœud du diagramme — <span>Échap</span> pour fermer</div>
 
-<div class="canvas-wrap">
-<div class="canvas" id="canvas">
+  <div class="canvas-wrap">
+    <div class="canvas" id="canvas" style="height:880px">
 
-<!-- SVG Arrows -->
-<svg viewBox="0 0 1500 820" xmlns="http://www.w3.org/2000/svg">
-<defs>
-<marker id="ah-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2d3a54"/></marker>
-<marker id="ah-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ff7043"/></marker>
-<marker id="ah-c" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#06d6f2"/></marker>
-<marker id="ah-gn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#22d68a"/></marker>
-<marker id="ah-y" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#fbbf24"/></marker>
-<marker id="ah-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f4516c"/></marker>
-<marker id="ah-p" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#a78bfa"/></marker>
-</defs>
+      <!-- SVG Arrows -->
+      <svg viewBox="0 0 1500 880" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ah-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#2d3a54" />
+          </marker>
+          <marker id="ah-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#ff7043" />
+          </marker>
+          <marker id="ah-c" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#06d6f2" />
+          </marker>
+          <marker id="ah-gn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#22d68a" />
+          </marker>
+          <marker id="ah-y" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#fbbf24" />
+          </marker>
+          <marker id="ah-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#f4516c" />
+          </marker>
+          <marker id="ah-p" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#a78bfa" />
+          </marker>
+          <marker id="ah-pk" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="#f472b6" />
+          </marker>
+        </defs>
 
-<!-- Row 1: Dataloader → Backbone → split -->
-<line x1="175" y1="115" x2="255" y2="115" class="arr-gray animated" marker-end="url(#ah-g)"/>
-<line x1="430" y1="115" x2="505" y2="115" class="arr-gray animated" marker-end="url(#ah-g)"/>
+        <!-- Row 1: Dataloader → Backbone → split -->
+        <line x1="175" y1="115" x2="255" y2="115" class="arr-gray animated" marker-end="url(#ah-g)" />
+        <line x1="430" y1="115" x2="505" y2="115" class="arr-gray animated" marker-end="url(#ah-g)" />
 
-<!-- Split to O2M (bottom path) — direct with gradient -->
-<polyline points="530,128 530,295 580,295" class="arr-orange animated" marker-end="url(#ah-o)"/>
-<text x="540" y="215" fill="#ff7043" font-size="9" font-family="JetBrains Mono" font-weight="600" transform="rotate(90 540,215)">GRADIENT ✓</text>
+        <!-- Split to O2M (bottom path) — direct with gradient -->
+        <polyline points="530,128 530,295 580,295" class="arr-orange animated" marker-end="url(#ah-o)" />
+        <text x="540" y="215" fill="#ff7043" font-size="9" font-family="JetBrains Mono" font-weight="600"
+          transform="rotate(90 540,215)">GRADIENT ✓</text>
 
-<!-- Split to detach (top path) -->
-<polyline points="530,102 530,45 580,45" class="arr-green animated" marker-end="url(#ah-gn)"/>
+        <!-- Split to detach (top path) -->
+        <polyline points="530,102 530,45 580,45" class="arr-green animated" marker-end="url(#ah-gn)" />
 
-<!-- detach → O2O -->
-<line x1="710" y1="45" x2="775" y2="45" class="arr-cyan animated" marker-end="url(#ah-c)"/>
+        <!-- detach → O2O -->
+        <line x1="710" y1="45" x2="775" y2="45" class="arr-cyan animated" marker-end="url(#ah-c)" />
 
-<!-- O2M → TAL O2M -->
-<line x1="728" y1="295" x2="795" y2="295" class="arr-orange animated" marker-end="url(#ah-o)"/>
-<!-- O2O → TAL O2O -->
-<line x1="910" y1="45" x2="975" y2="45" class="arr-cyan animated" marker-end="url(#ah-c)"/>
+        <!-- O2M → TAL O2M -->
+        <line x1="728" y1="295" x2="795" y2="295" class="arr-orange animated" marker-end="url(#ah-o)" />
+        <!-- O2O → TAL O2O -->
+        <line x1="910" y1="45" x2="975" y2="45" class="arr-cyan animated" marker-end="url(#ah-c)" />
 
-<!-- Annotations → both TALs -->
-<line x1="610" y1="495" x2="610" y2="445" class="arr-yellow animated" marker-end="url(#ah-y)"/>
-<polyline points="610,445 880,445 880,320 908,320" class="arr-yellow animated" marker-end="url(#ah-y)"/>
-<polyline points="610,445 1050,445 1050,70 1060,70" class="arr-yellow animated" marker-end="url(#ah-y)"/>
+        <!-- Annotations → STAL -->
+        <polyline points="610,555 610,475 648,475" class="arr-yellow animated" marker-end="url(#ah-y)" />
 
-<!-- TAL O2M → Perte O2M -->
-<line x1="920" y1="295" x2="985" y2="295" class="arr-red animated" marker-end="url(#ah-r)"/>
-<!-- TAL O2O → Perte O2O -->
-<line x1="1095" y1="45" x2="1150" y2="45" class="arr-red animated" marker-end="url(#ah-r)"/>
+        <!-- STAL → TAL O2M -->
+        <polyline points="792,470 880,470 880,320 908,320" class="arr-pink animated" style="stroke:var(--pink)"
+          marker-end="url(#ah-pk)" />
+        <!-- STAL → TAL O2O -->
+        <polyline points="792,470 1050,470 1050,70 1060,70" class="arr-pink animated" style="stroke:var(--pink)"
+          marker-end="url(#ah-pk)" />
 
-<!-- Perte O2M → ProgLoss -->
-<polyline points="1115,295 1160,295 1160,192 1260,192" class="arr-red animated" marker-end="url(#ah-r)"/>
-<!-- Perte O2O → ProgLoss -->
-<polyline points="1280,48 1340,48 1340,155" class="arr-red animated" marker-end="url(#ah-r)"/>
+        <!-- TAL O2M → Perte O2M -->
+        <line x1="920" y1="295" x2="985" y2="295" class="arr-red animated" marker-end="url(#ah-r)" />
+        <!-- TAL O2O → Perte O2O -->
+        <line x1="1095" y1="45" x2="1150" y2="45" class="arr-red animated" marker-end="url(#ah-r)" />
 
-<!-- ProgLoss → Backprop -->
-<line x1="1340" y1="225" x2="1340" y2="330" class="arr-green animated" marker-end="url(#ah-gn)"/>
+        <!-- Perte O2M → ProgLoss -->
+        <polyline points="1115,295 1160,295 1160,192 1260,192" class="arr-red animated" marker-end="url(#ah-r)" />
+        <!-- Perte O2O → ProgLoss -->
+        <polyline points="1280,48 1340,48 1340,155" class="arr-red animated" marker-end="url(#ah-r)" />
 
-<!-- Backprop → MuSGD -->
-<line x1="1340" y1="405" x2="1340" y2="465" class="arr-purple animated" marker-end="url(#ah-p)"/>
+        <!-- ProgLoss → Backprop -->
+        <line x1="1340" y1="225" x2="1340" y2="330" class="arr-green animated" marker-end="url(#ah-gn)" />
 
-<!-- MuSGD → Fin d'époque -->
-<line x1="1340" y1="540" x2="1340" y2="595" class="arr-purple animated" marker-end="url(#ah-p)"/>
+        <!-- Backprop → MuSGD -->
+        <line x1="1340" y1="405" x2="1340" y2="465" class="arr-purple animated" marker-end="url(#ah-p)" />
 
-<!-- Fin d'époque loop back (curved) -->
-<path d="M1395,630 Q1460,630 1460,400 Q1460,180 1395,200" class="arr-green animated" marker-end="url(#ah-gn)"/>
-<text x="1468" y="400" fill="#22d68a" font-size="8" font-family="JetBrains Mono" transform="rotate(90 1468,400)">NEXT EPOCH</text>
+        <!-- MuSGD → Fin d'époque -->
+        <line x1="1340" y1="540" x2="1340" y2="595" class="arr-purple animated" marker-end="url(#ah-p)" />
 
-<!-- Inférence arrow (separate) -->
-<line x1="1340" y1="670" x2="1340" y2="720" class="arr-cyan animated" stroke-width="2.5" marker-end="url(#ah-c)"/>
-</svg>
+        <!-- Fin d'époque loop back (curved) -->
+        <path d="M1395,630 Q1460,630 1460,400 Q1460,180 1395,200" class="arr-green animated" marker-end="url(#ah-gn)" />
+        <text x="1468" y="400" fill="#22d68a" font-size="8" font-family="JetBrains Mono"
+          transform="rotate(90 1468,400)">NEXT EPOCH</text>
 
-<!-- Phase labels -->
-<div class="phase-tag" style="left:30px;top:70px;color:var(--purple);background:rgba(167,139,250,.08)">◆ FORWARD</div>
-<div class="phase-tag" style="left:810px;top:250px;color:var(--yellow);background:rgba(251,191,36,.08)">◆ ASSIGNATION</div>
-<div class="phase-tag" style="left:990px;top:250px;color:var(--red);background:rgba(244,81,108,.08)">◆ PERTES</div>
-<div class="phase-tag" style="left:1270px;top:305px;color:var(--green);background:rgba(34,214,138,.08)">◆ OPTIMISATION</div>
+        <!-- Inférence arrow (separate) -->
+        <line x1="1340" y1="670" x2="1340" y2="720" class="arr-cyan animated" stroke-width="2.5"
+          marker-end="url(#ah-c)" />
+      </svg>
 
-<!-- ═══ NODES ═══ -->
-<!-- 01 Dataloader -->
-<div class="node n-data" style="left:30px;top:85px;width:140px" onclick="openModal(0)">
-<span class="badge">01</span><div class="icon">📦</div><div class="label">Dataloader</div><div class="sub">640×640 · mosaic</div>
-</div>
+      <!-- Phase labels -->
+      <div class="phase-tag" style="left:30px;top:70px;color:var(--purple);background:rgba(167,139,250,.08)">◆ FORWARD
+      </div>
+      <div class="phase-tag" style="left:650px;top:430px;color:var(--pink);background:rgba(244,114,182,.08)">◆ STAL
+      </div>
+      <div class="phase-tag" style="left:810px;top:250px;color:var(--yellow);background:rgba(251,191,36,.08)">◆
+        ASSIGNATION</div>
+      <div class="phase-tag" style="left:990px;top:250px;color:var(--red);background:rgba(244,81,108,.08)">◆ PERTES
+      </div>
+      <div class="phase-tag" style="left:1270px;top:305px;color:var(--green);background:rgba(34,214,138,.08)">◆
+        OPTIMISATION</div>
 
-<!-- 02 Backbone -->
-<div class="node n-back" style="left:260px;top:78px;width:165px;height:75px" onclick="openModal(1)">
-<span class="badge">02</span><div class="icon">🧠</div><div class="label">Backbone + Neck</div><div class="sub">CSPDarknet · FPN<br>P3 P4 P5 → 8400</div>
-</div>
+      <!-- ═══ NODES ═══ -->
+      <!-- 01 Dataloader -->
+      <div class="node n-data" style="left:30px;top:85px;width:140px" onclick="openModal(0)">
+        <span class="badge">01</span>
+        <div class="icon">📦</div>
+        <div class="label">Dataloader</div>
+        <div class="sub">640×640 · mosaic</div>
+      </div>
 
-<!-- Split point -->
-<div class="split-dot" style="left:523px;top:108px" title="Point de séparation"></div>
+      <!-- 02 Backbone -->
+      <div class="node n-back" style="left:260px;top:78px;width:165px;height:75px" onclick="openModal(1)">
+        <span class="badge">02</span>
+        <div class="icon">🧠</div>
+        <div class="label">Backbone + Neck</div>
+        <div class="sub">CSPDarknet · FPN<br>P3 P4 P5 → 8400</div>
+      </div>
 
-<!-- 03 detach() — top path -->
-<div class="node n-det" style="left:585px;top:20px;width:120px" onclick="openModal(3)">
-<span class="badge">04</span><div class="icon">✂️</div><div class="label">detach()</div><div class="sub">stop gradient</div>
-</div>
+      <!-- Split point -->
+      <div class="split-dot" style="left:523px;top:108px" title="Point de séparation"></div>
 
-<!-- 04 Tête O2O — top path -->
-<div class="node n-o2o" style="left:780px;top:15px;width:128px;height:65px" onclick="openModal(4)">
-<span class="badge">05</span><div class="icon">🔷</div><div class="label">Tête O2O</div><div class="sub">one-to-one<br>sans grad backbone</div>
-</div>
+      <!-- 03 Tête O2M — bottom path -->
+      <div class="node n-o2m" style="left:585px;top:265px;width:140px;height:65px" onclick="openModal(2)">
+        <span class="badge">03</span>
+        <div class="icon">🔶</div>
+        <div class="label">Tête O2M</div>
+        <div class="sub">one-to-many<br>avec gradient ✓</div>
+      </div>
 
-<!-- 05 Tête O2M — bottom path -->
-<div class="node n-o2m" style="left:585px;top:265px;width:140px;height:65px" onclick="openModal(2)">
-<span class="badge">03</span><div class="icon">🔶</div><div class="label">Tête O2M</div><div class="sub">one-to-many<br>avec gradient ✓</div>
-</div>
+      <!-- 04 detach() — top path -->
+      <div class="node n-det" style="left:585px;top:20px;width:120px" onclick="openModal(3)">
+        <span class="badge">04</span>
+        <div class="icon">✂️</div>
+        <div class="label">detach()</div>
+        <div class="sub">stop gradient</div>
+      </div>
 
-<!-- 06 Pré-traitement annotations (center) -->
-<div class="node n-tal" style="left:530px;top:500px;width:155px" onclick="openModal(5)">
-<span class="badge">06</span><div class="icon">📋</div><div class="label">Annotations</div><div class="sub">xywh→xyxy · make_anchors</div>
-</div>
+      <!-- 05 Tête O2O — top path -->
+      <div class="node n-o2o" style="left:780px;top:15px;width:128px;height:65px" onclick="openModal(4)">
+        <span class="badge">05</span>
+        <div class="icon">🔷</div>
+        <div class="label">Tête O2O</div>
+        <div class="sub">one-to-one<br>sans grad backbone</div>
+      </div>
 
-<!-- 07 TAL O2M -->
-<div class="node n-tal" style="left:800px;top:265px;width:118px" onclick="openModal(6)">
-<span class="badge">07</span><div class="icon">🎯</div><div class="label">TAL O2M</div><div class="sub">topk = 10</div>
-</div>
+      <!-- 06 Pré-traitement annotations (center) -->
+      <div class="node n-tal" style="left:530px;top:560px;width:155px" onclick="openModal(5)">
+        <span class="badge">06</span>
+        <div class="icon">📋</div>
+        <div class="label">Annotations</div>
+        <div class="sub">xywh→xyxy · make_anchors</div>
+      </div>
 
-<!-- 08 TAL O2O -->
-<div class="node n-tal" style="left:980px;top:15px;width:118px;height:65px" onclick="openModal(7)">
-<span class="badge">08</span><div class="icon">🎯</div><div class="label">TAL O2O</div><div class="sub">topk=7→topk2=1</div>
-</div>
+      <!-- 07 STAL (between annotations and TALs) -->
+      <div class="node n-stal" style="left:645px;top:445px;width:145px;height:90px" onclick="openModal(6)">
+        <span class="badge">07</span>
+        <div class="icon">🔬</div>
+        <div class="label">STAL</div>
+        <div class="sub">small target alignment<br>GT &lt; 8px → 16px</div>
+      </div>
 
-<!-- 09 Perte O2M -->
-<div class="node n-loss" style="left:990px;top:265px;width:120px" onclick="openModal(8)">
-<span class="badge">09</span><div class="icon">📉</div><div class="label">Perte O2M</div><div class="sub">CIoU+BCE+L1</div>
-</div>
+      <!-- 08 TAL O2M -->
+      <div class="node n-tal" style="left:800px;top:265px;width:118px" onclick="openModal(7)">
+        <span class="badge">08</span>
+        <div class="icon">🎯</div>
+        <div class="label">TAL O2M</div>
+        <div class="sub">topk = 10</div>
+      </div>
 
-<!-- 10 Perte O2O -->
-<div class="node n-loss" style="left:1155px;top:15px;width:120px;height:65px" onclick="openModal(9)">
-<span class="badge">10</span><div class="icon">📉</div><div class="label">Perte O2O</div><div class="sub">CIoU+BCE+L1</div>
-</div>
+      <!-- 09 TAL O2O -->
+      <div class="node n-tal" style="left:980px;top:15px;width:118px;height:65px" onclick="openModal(8)">
+        <span class="badge">09</span>
+        <div class="icon">🎯</div>
+        <div class="label">TAL O2O</div>
+        <div class="sub">topk=7→topk2=1</div>
+      </div>
 
-<!-- 11 ProgLoss -->
-<div class="node n-prog" style="left:1265px;top:160px;width:150px;height:65px" onclick="openModal(10)">
-<span class="badge">11</span><div class="icon">⚖️</div><div class="label">ProgLoss</div><div class="sub">w_o2m↘ · w_o2o↗</div>
-</div>
+      <!-- 10 Perte O2M -->
+      <div class="node n-loss" style="left:990px;top:265px;width:120px" onclick="openModal(9)">
+        <span class="badge">10</span>
+        <div class="icon">📉</div>
+        <div class="label">Perte O2M</div>
+        <div class="sub">CIoU+BCE+L1</div>
+      </div>
 
-<!-- 12 Backpropagation -->
-<div class="node n-optim" style="left:1275px;top:335px;width:130px" onclick="openModal(11)">
-<span class="badge">12</span><div class="icon">🔙</div><div class="label">Backprop</div><div class="sub">∂L/∂w autograd</div>
-</div>
+      <!-- 11 Perte O2O -->
+      <div class="node n-loss" style="left:1155px;top:15px;width:120px;height:65px" onclick="openModal(10)">
+        <span class="badge">11</span>
+        <div class="icon">📉</div>
+        <div class="label">Perte O2O</div>
+        <div class="sub">CIoU+BCE+L1</div>
+      </div>
 
-<!-- 13 MuSGD -->
-<div class="node n-optim" style="left:1275px;top:470px;width:130px" onclick="openModal(12)">
-<span class="badge">13</span><div class="icon">⚡</div><div class="label">MuSGD</div><div class="sub">SGD + Muon</div>
-</div>
+      <!-- 12 ProgLoss -->
+      <div class="node n-prog" style="left:1265px;top:160px;width:150px;height:65px" onclick="openModal(11)">
+        <span class="badge">12</span>
+        <div class="icon">⚖️</div>
+        <div class="label">ProgLoss</div>
+        <div class="sub">w_o2m↘ · w_o2o↗</div>
+      </div>
 
-<!-- 14 Fin d'époque -->
-<div class="node n-prog" style="left:1275px;top:600px;width:130px" onclick="openModal(13)">
-<span class="badge">14</span><div class="icon">🔄</div><div class="label">Fin d'époque</div><div class="sub">update ProgLoss</div>
-</div>
+      <!-- 13 Backpropagation -->
+      <div class="node n-optim" style="left:1275px;top:335px;width:130px" onclick="openModal(12)">
+        <span class="badge">13</span>
+        <div class="icon">🔙</div>
+        <div class="label">Backprop</div>
+        <div class="sub">∂L/∂w autograd</div>
+      </div>
 
-<!-- 15 Inférence -->
-<div class="node n-infer" style="left:1260px;top:725px;width:160px" onclick="openModal(14)">
-<span class="badge">15</span><div class="icon">🚀</div><div class="label">Inférence</div><div class="sub">O2O seule · [1,300,6]<br>SANS NMS ✓</div>
-</div>
+      <!-- 14 MuSGD -->
+      <div class="node n-optim" style="left:1275px;top:470px;width:130px" onclick="openModal(13)">
+        <span class="badge">14</span>
+        <div class="icon">⚡</div>
+        <div class="label">MuSGD</div>
+        <div class="sub">SGD + Muon</div>
+      </div>
 
-</div><!-- end canvas -->
-</div>
+      <!-- 15 Fin d'époque -->
+      <div class="node n-prog" style="left:1275px;top:600px;width:130px" onclick="openModal(14)">
+        <span class="badge">15</span>
+        <div class="icon">🔄</div>
+        <div class="label">Fin d'époque</div>
+        <div class="sub">update ProgLoss</div>
+      </div>
 
-<!-- ═══ MODAL ═══ -->
-<div class="modal-overlay" id="overlay" onclick="if(event.target===this)closeModal()">
-<div class="modal" id="modal"></div>
-</div>
+      <!-- 16 Inférence -->
+      <div class="node n-infer" style="left:1260px;top:725px;width:160px" onclick="openModal(15)">
+        <span class="badge">16</span>
+        <div class="icon">🚀</div>
+        <div class="label">Inférence</div>
+        <div class="sub">O2O seule · [1,300,6]<br>SANS NMS ✓</div>
+      </div>
 
-<footer>YOLO26 NMS-Free · Sources : Wang et al. (YOLOv10, NeurIPS 2024) · Ultralytics YOLO26 · Chakrabarty · Sapkota et al.</footer>
+    </div><!-- end canvas -->
+  </div>
 
-<script>
-const D=[
-{t:"Dataloader",ic:"📦",s:"Étape 01 · Phase Forward",
-what:`<p>Prépare et alimente le modèle en <strong>lots (batches) d'images et annotations</strong> prêtes à l'emploi :</p><ul><li><code>img</code> : tensor <code>[B, 3, 640, 640]</code> — B images RGB normalisées</li><li><code>cls</code> : classes des objets (0-79 pour le dataset COCO, 80 catégories)</li><li><code>bboxes</code> : boîtes englobantes normalisées au format [x_centre, y_centre, largeur, hauteur]</li><li><code>batch_idx</code> : identifiant de l'image pour chaque annotation</li></ul><p class="note">Un <strong>batch</strong> (lot) permet de traiter plusieurs images en parallèle sur le GPU, accélérant l'entraînement.</p>`,
-how:`<p>Le processus suit plusieurs transformations successives :</p><ul><li><strong>Redimensionnement</strong> : toutes les images sont mises au format carré 640×640 pixels (les proportions sont conservées avec du padding si nécessaire)</li><li><strong>Mosaïque</strong> : 4 images sont fusionnées en une seule, créant un contexte riche avec des objets à différentes échelles et positions</li><li><strong>Mixup</strong> : superposition pondérée de 2 images (α=0.5) pour augmenter la diversité visuelle</li><li><strong>Normalisation</strong> : chaque pixel est divisé par 255, passant de l'intervalle [0,255] à [0,1] — cela stabilise les calculs numériques</li><li><strong>Flip horizontal</strong> aléatoire (probabilité 50%) — un piéton à gauche devient un piéton à droite</li></ul><div class="fm">batch["img"] = img.float() / <span class="ho">255.0</span>  # normalisation [0,255]→[0,1]
+  <!-- ═══ MODAL ═══ -->
+  <div class="modal-overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <footer>YOLO26 NMS-Free · Sources : Wang et al. (YOLOv10, NeurIPS 2024) · Ultralytics YOLO26 · Chakrabarty · Sapkota
+    et al.</footer>
+
+  <script>
+    const D = [
+      {
+        t: "Dataloader", ic: "📦", s: "Étape 01 · Phase Forward",
+        what: `<p>Prépare et alimente le modèle en <strong>lots (batches) d'images et annotations</strong> prêtes à l'emploi :</p><ul><li><code>img</code> : tensor <code>[B, 3, 640, 640]</code> — B images RGB normalisées</li><li><code>cls</code> : classes des objets (0-79 pour le dataset COCO, 80 catégories)</li><li><code>bboxes</code> : boîtes englobantes normalisées au format [x_centre, y_centre, largeur, hauteur]</li><li><code>batch_idx</code> : identifiant de l'image pour chaque annotation</li></ul><p class="note">Un <strong>batch</strong> (lot) permet de traiter plusieurs images en parallèle sur le GPU, accélérant l'entraînement.</p>`,
+        how: `<p>Le processus suit plusieurs transformations successives :</p><ul><li><strong>Redimensionnement</strong> : toutes les images sont mises au format carré 640×640 pixels (les proportions sont conservées avec du padding si nécessaire)</li><li><strong>Mosaïque</strong> : 4 images sont fusionnées en une seule, créant un contexte riche avec des objets à différentes échelles et positions</li><li><strong>Mixup</strong> : superposition pondérée de 2 images (α=0.5) pour augmenter la diversité visuelle</li><li><strong>Normalisation</strong> : chaque pixel est divisé par 255, passant de l'intervalle [0,255] à [0,1] — cela stabilise les calculs numériques</li><li><strong>Flip horizontal</strong> aléatoire (probabilité 50%) — un piéton à gauche devient un piéton à droite</li></ul><div class="fm">batch["img"] = img.float() / <span class="ho">255.0</span>  # normalisation [0,255]→[0,1]
 # Sortie : tensor de forme [B, 3, <span class="hc">640</span>, <span class="hc">640</span>]
 # B = taille du batch (ex: 16 images)
 # 3 = canaux RGB (Rouge, Vert, Bleu)</div>`,
-why:`<p><strong>Pourquoi ces augmentations et pas d'autres ?</strong> Les augmentations choisies (mosaïque, mixup, flip) simulent des conditions réelles variées : changements de position, de taille, d'orientation. Un modèle qui voit toujours les mêmes images apprend par cœur (<strong>surapprentissage</strong>) au lieu de généraliser.</p><p><strong>Pourquoi normaliser ?</strong> Les réseaux de neurones fonctionnent mieux quand les entrées sont dans un intervalle restreint. Des valeurs entre 0 et 1 évitent les problèmes de gradients trop grands ou trop petits.</p><p><strong>Pourquoi 640×640 ?</strong> C'est un compromis entre résolution (détails visibles) et vitesse de calcul. Un multiple de 32, compatible avec les strides du backbone (8, 16, 32).</p>`,
-ana:`<p>C'est comme préparer des <strong>cartes d'entraînement pour un sportif</strong> : on lui fait travailler toutes les variantes possibles (terrain dur, herbe, pluie, soleil) pour qu'il soit prêt à n'importe quelle situation le jour du match. Sans cette diversité, il excelle uniquement dans les conditions d'entraînement.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Résolution fixe : <strong>640×640</strong> pixels (carré)</li><li>Augmentations clés : mosaïque (4 images), mixup, flip</li><li>Normalisation : pixels / 255 → [0, 1]</li><li>Aucune modification spéciale pour le NMS-Free — le secret est dans l'assignation, pas dans les données</li></ul></div>`},
+        why: `<p><strong>Pourquoi ces augmentations et pas d'autres ?</strong> Les augmentations choisies (mosaïque, mixup, flip) simulent des conditions réelles variées : changements de position, de taille, d'orientation. Un modèle qui voit toujours les mêmes images apprend par cœur (<strong>surapprentissage</strong>) au lieu de généraliser.</p><p><strong>Pourquoi normaliser ?</strong> Les réseaux de neurones fonctionnent mieux quand les entrées sont dans un intervalle restreint. Des valeurs entre 0 et 1 évitent les problèmes de gradients trop grands ou trop petits.</p><p><strong>Pourquoi 640×640 ?</strong> C'est un compromis entre résolution (détails visibles) et vitesse de calcul. Un multiple de 32, compatible avec les strides du backbone (8, 16, 32).</p>`,
+        ana: `<p>C'est comme préparer des <strong>cartes d'entraînement pour un sportif</strong> : on lui fait travailler toutes les variantes possibles (terrain dur, herbe, pluie, soleil) pour qu'il soit prêt à n'importe quelle situation le jour du match. Sans cette diversité, il excelle uniquement dans les conditions d'entraînement.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Résolution fixe : <strong>640×640</strong> pixels (carré)</li><li>Augmentations clés : mosaïque (4 images), mixup, flip</li><li>Normalisation : pixels / 255 → [0, 1]</li><li>Aucune modification spéciale pour le NMS-Free — le secret est dans l'assignation, pas dans les données</li></ul></div>`
+      },
 
-{t:"Backbone + Neck",ic:"🧠",s:"Étape 02 · Phase Forward",
-what:`<p>Convertir l'image brute en <strong>cartes de caractéristiques</strong> (feature maps) à 3 résolutions différentes, permettant de détecter des objets de toutes tailles :</p><ul><li><strong>P3</strong> (80×80, stride 8) → <strong>6400 ancres</strong> — capture les <em>petits objets</em> (piéton éloigné ~10px)</li><li><strong>P4</strong> (40×40, stride 16) → <strong>1600 ancres</strong> — objets de taille <em>moyenne</em></li><li><strong>P5</strong> (20×20, stride 32) → <strong>400 ancres</strong> — <em>grands objets</em> (bus proche ~400px)</li><li>Total : <code>6400 + 1600 + 400 = <strong>8400 ancres</strong></code> par image</li></ul><p class="note">Le <strong>stride</strong> est le facteur de réduction : un stride de 8 signifie qu'un pixel de la feature map correspond à une zone de 8×8 pixels dans l'image originale.</p>`,
-how:`<p>Le backbone (<strong>CSPDarknet</strong>) est une succession de couches convolutives qui réduisent la résolution tout en augmentant le nombre de canaux. Un module <strong>Neck (FPN)</strong> fusionne ensuite les différentes échelles :</p><div class="fm">Image [B, 3, 640, 640]  ← entrée brute
+      {
+        t: "Backbone + Neck", ic: "🧠", s: "Étape 02 · Phase Forward",
+        what: `<p>Convertir l'image brute en <strong>cartes de caractéristiques</strong> (feature maps) à 3 résolutions différentes, permettant de détecter des objets de toutes tailles :</p><ul><li><strong>P3</strong> (80×80, stride 8) → <strong>6400 ancres</strong> — capture les <em>petits objets</em> (piéton éloigné ~10px)</li><li><strong>P4</strong> (40×40, stride 16) → <strong>1600 ancres</strong> — objets de taille <em>moyenne</em></li><li><strong>P5</strong> (20×20, stride 32) → <strong>400 ancres</strong> — <em>grands objets</em> (bus proche ~400px)</li><li>Total : <code>6400 + 1600 + 400 = <strong>8400 ancres</strong></code> par image</li></ul><p class="note">Le <strong>stride</strong> est le facteur de réduction : un stride de 8 signifie qu'un pixel de la feature map correspond à une zone de 8×8 pixels dans l'image originale.</p>`,
+        how: `<p>Le backbone (<strong>CSPDarknet</strong>) est une succession de couches convolutives qui réduisent la résolution tout en augmentant le nombre de canaux. Un module <strong>Neck (FPN)</strong> fusionne ensuite les différentes échelles :</p><div class="fm">Image [B, 3, 640, 640]  ← entrée brute
   ↓ Stem + Stage1 → [B, 64, 160, 160]
   ↓ Stage2 → [B, 128, <span class="hg">80, 80</span>]  → <span class="hg">P3</span> (petits objets)
   ↓ Stage3 → [B, 256, <span class="hg">40, 40</span>]  → <span class="hg">P4</span> (objets moyens)
   ↓ Stage4 → [B, 512, <span class="hg">20, 20</span>]  → <span class="hg">P5</span> (grands objets)
   ↓ Neck FPN : fusion top-down + bottom-up de P3+P4+P5</div><p>Les blocs <code>C2f</code> utilisent des <strong>connexions résiduelles</strong> (Cross-Stage Partial) qui améliorent le flux de gradient et réduisent la redondance des calculs.</p>`,
-why:`<p><strong>Pourquoi une architecture multi-échelle ?</strong> Un piéton à 100 mètres occupe ~10 pixels dans l'image — seul P3 (stride 8) a la résolution suffisante pour le « voir ». Un bus de face occupe ~400 pixels — P5 (stride 32) est plus adapté. Sans multi-échelle, on détecterait bien une taille mais pas les autres.</p><p><strong>Pourquoi CSPDarknet plutôt que ResNet ?</strong> CSPDarknet offre un meilleur ratio <strong>précision/FLOPs</strong> pour la détection temps réel. Les connexions partielles (CSP) divisent les features en deux : une moitié traverse les couches denses, l'autre est directement concaténée. Résultat : moins de calculs redondants.</p><p><strong>Pourquoi un Neck FPN ?</strong> Le backbone seul produit des features à chaque niveau, mais elles sont isolées. Le FPN (Feature Pyramid Network) crée des chemins de communication entre les niveaux pour que P3 bénéficie du contexte global de P5 et vice-versa.</p>`,
-ana:`<p>C'est comme <strong>regarder une photo avec 3 loupes différentes</strong> : une vue large pour repérer les gros objets (voiture), une vue moyenne pour les objets standards (personne), et un zoom serré pour les détails fins (chat au loin). Le réseau fait les trois analyses <em>simultanément</em>.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>3 niveaux de features : P3 (80×80), P4 (40×40), P5 (20×20)</li><li>Total : <strong>8400 ancres</strong> par image</li><li>Le backbone + neck sont <strong>partagés</strong> entre les deux têtes O2M et O2O</li><li>Architecture : CSPDarknet (C2f / RepVGG) + Neck FPN</li></ul></div>`},
+        why: `<p><strong>Pourquoi une architecture multi-échelle ?</strong> Un piéton à 100 mètres occupe ~10 pixels dans l'image — seul P3 (stride 8) a la résolution suffisante pour le « voir ». Un bus de face occupe ~400 pixels — P5 (stride 32) est plus adapté. Sans multi-échelle, on détecterait bien une taille mais pas les autres.</p><p><strong>Pourquoi CSPDarknet plutôt que ResNet ?</strong> CSPDarknet offre un meilleur ratio <strong>précision/FLOPs</strong> pour la détection temps réel. Les connexions partielles (CSP) divisent les features en deux : une moitié traverse les couches denses, l'autre est directement concaténée. Résultat : moins de calculs redondants.</p><p><strong>Pourquoi un Neck FPN ?</strong> Le backbone seul produit des features à chaque niveau, mais elles sont isolées. Le FPN (Feature Pyramid Network) crée des chemins de communication entre les niveaux pour que P3 bénéficie du contexte global de P5 et vice-versa.</p>`,
+        ana: `<p>C'est comme <strong>regarder une photo avec 3 loupes différentes</strong> : une vue large pour repérer les gros objets (voiture), une vue moyenne pour les objets standards (personne), et un zoom serré pour les détails fins (chat au loin). Le réseau fait les trois analyses <em>simultanément</em>.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>3 niveaux de features : P3 (80×80), P4 (40×40), P5 (20×20)</li><li>Total : <strong>8400 ancres</strong> par image</li><li>Le backbone + neck sont <strong>partagés</strong> entre les deux têtes O2M et O2O</li><li>Architecture : CSPDarknet (C2f / RepVGG) + Neck FPN</li></ul></div>`
+      },
 
-{t:"Tête O2M (avec gradient)",ic:"🔶",s:"Étape 03 · Phase Forward",
-what:`<p>Produire des <strong>prédictions redondantes</strong> — environ 10 par objet — qui servent de signal d'apprentissage riche pour entraîner le backbone. La tête O2M est le <strong>« professeur »</strong> du système : elle fournit beaucoup de feedback (10 réponses par question), permettant au backbone d'apprendre rapidement.</p><p>Le nom « <strong>One-to-Many</strong> » signifie qu'un objet réel (ground truth) est associé à <em>plusieurs</em> prédictions positives.</p>`,
-how:`<p>Les features P3/P4/P5 du backbone passent par deux branches parallèles :</p><ul><li><strong>Branche régression</strong> (<code>cv2</code>) : Conv 3×3 → Conv 3×3 → Conv2d 1×1 → <strong>4 distances</strong> (gauche, haut, droite, bas par rapport au centre de l'ancre)</li><li><strong>Branche classification</strong> (<code>cv3</code>) : DWConv 3×3 → Conv 1×1 → DWConv 3×3 → Conv 1×1 → <strong>80 scores de classe</strong></li></ul><div class="fm">preds_o2m = forward_head(x, box_head=<span class="ho">cv2</span>, cls_head=<span class="ho">cv3</span>)
+      {
+        t: "Tête O2M (avec gradient)", ic: "🔶", s: "Étape 03 · Phase Forward",
+        what: `<p>Produire des <strong>prédictions redondantes</strong> — environ 10 par objet — qui servent de signal d'apprentissage riche pour entraîner le backbone. La tête O2M est le <strong>« professeur »</strong> du système : elle fournit beaucoup de feedback (10 réponses par question), permettant au backbone d'apprendre rapidement.</p><p>Le nom « <strong>One-to-Many</strong> » signifie qu'un objet réel (ground truth) est associé à <em>plusieurs</em> prédictions positives.</p>`,
+        how: `<p>Les features P3/P4/P5 du backbone passent par deux branches parallèles :</p><ul><li><strong>Branche régression</strong> (<code>cv2</code>) : Conv 3×3 → Conv 3×3 → Conv2d 1×1 → <strong>4 distances</strong> (gauche, haut, droite, bas par rapport au centre de l'ancre)</li><li><strong>Branche classification</strong> (<code>cv3</code>) : DWConv 3×3 → Conv 1×1 → DWConv 3×3 → Conv 1×1 → <strong>80 scores de classe</strong></li></ul><div class="fm">preds_o2m = forward_head(x, box_head=<span class="ho">cv2</span>, cls_head=<span class="ho">cv3</span>)
 # → boxes:  [B, 4, <span class="hc">8400</span>]   ← 4 distances par ancre
 # → scores: [B, 80, <span class="hc">8400</span>]  ← 80 classes par ancre
 
 # ⚡ <span class="ho">LES GRADIENTS REMONTENT AU BACKBONE</span>
 # car le forward est fait AVEC le graphe de calcul intact</div><p>Le TAL assignera ensuite <strong>10 ancres positives</strong> par objet parmi ces 8400 prédictions (voir étape 7).</p>`,
-why:`<p><strong>Pourquoi 10 prédictions et pas 1 seule ?</strong> Avec une seule ancre/objet (comme O2O), le backbone ne recevrait qu'un signal très faible (1 gradient sur 8400 ancres). Résultat : convergence très lente et perte de <strong>−2 à −3% mAP</strong>.</p><p><strong>Pourquoi cette stratégie est historique ?</strong> Tous les YOLO avant v10 (v5, v7, v8, v11) utilisent exclusivement O2M. C'est la méthode classique, éprouvée. YOLO26 la conserve comme « tuteur » pendant l'entraînement.</p><p><strong>Pourquoi « avec gradient » ?</strong> Les erreurs de O2M sont rétropropagées à travers <code>cv2</code> et <code>cv3</code> jusqu'au backbone, modifiant ses poids. C'est O2M qui entraîne principalement le backbone.</p>`,
-ana:`<p>C'est comme donner <strong>10 fléchettes à un débutant</strong> pour viser une cible : même ses lancers ratés (qui frôlent la cible) lui donnent des indices sur comment ajuster son geste. Avec une seule fléchette, il n'aurait qu'un seul retour — beaucoup plus lent pour apprendre.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>O2M = One-to-Many = <strong>10 ancres positives par objet</strong></li><li>Utilisée <strong>uniquement à l'entraînement</strong> (supprimée à l'inférence)</li><li>Ses gradients <strong>remontent au backbone</strong> → entraîne les features</li><li>Sans O2M : −2 à −3% mAP (backbone sous-entraîné)</li></ul></div>`},
+        why: `<p><strong>Pourquoi 10 prédictions et pas 1 seule ?</strong> Avec une seule ancre/objet (comme O2O), le backbone ne recevrait qu'un signal très faible (1 gradient sur 8400 ancres). Résultat : convergence très lente et perte de <strong>−2 à −3% mAP</strong>.</p><p><strong>Pourquoi cette stratégie est historique ?</strong> Tous les YOLO avant v10 (v5, v7, v8, v11) utilisent exclusivement O2M. C'est la méthode classique, éprouvée. YOLO26 la conserve comme « tuteur » pendant l'entraînement.</p><p><strong>Pourquoi « avec gradient » ?</strong> Les erreurs de O2M sont rétropropagées à travers <code>cv2</code> et <code>cv3</code> jusqu'au backbone, modifiant ses poids. C'est O2M qui entraîne principalement le backbone.</p>`,
+        ana: `<p>C'est comme donner <strong>10 fléchettes à un débutant</strong> pour viser une cible : même ses lancers ratés (qui frôlent la cible) lui donnent des indices sur comment ajuster son geste. Avec une seule fléchette, il n'aurait qu'un seul retour — beaucoup plus lent pour apprendre.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>O2M = One-to-Many = <strong>10 ancres positives par objet</strong></li><li>Utilisée <strong>uniquement à l'entraînement</strong> (supprimée à l'inférence)</li><li>Ses gradients <strong>remontent au backbone</strong> → entraîne les features</li><li>Sans O2M : −2 à −3% mAP (backbone sous-entraîné)</li></ul></div>`
+      },
 
-{t:"detach()",ic:"✂️",s:"Étape 04 · Phase Forward",
-what:`<p>Couper le lien de calcul entre le backbone et la tête O2O. Concrètement, <code>features.detach()</code> crée une <strong>copie des tenseurs sans historique de calcul</strong> (le champ <code>grad_fn</code> est mis à <code>None</code>). Cette copie nourrit la tête O2O, mais quand la perte de O2O sera rétropropagée, <strong>aucun gradient ne remontera au backbone</strong>.</p><p class="note"><strong>Gradient</strong> = la direction et l'amplitude de la correction à appliquer à chaque poids. C'est le « retour d'information » qui dit au réseau comment s'améliorer.</p>`,
-how:`<p>En PyTorch, chaque tenseur garde un historique de toutes les opérations qui l'ont produit (le <strong>graphe de calcul</strong>). <code>detach()</code> supprime cet historique :</p><div class="fm"><span class="hg">x_detach</span> = [xi.<span class="hg">detach()</span> for xi in x]
+      {
+        t: "detach()", ic: "✂️", s: "Étape 04 · Phase Forward",
+        what: `<p>Couper le lien de calcul entre le backbone et la tête O2O. Concrètement, <code>features.detach()</code> crée une <strong>copie des tenseurs sans historique de calcul</strong> (le champ <code>grad_fn</code> est mis à <code>None</code>). Cette copie nourrit la tête O2O, mais quand la perte de O2O sera rétropropagée, <strong>aucun gradient ne remontera au backbone</strong>.</p><p class="note"><strong>Gradient</strong> = la direction et l'amplitude de la correction à appliquer à chaque poids. C'est le « retour d'information » qui dit au réseau comment s'améliorer.</p>`,
+        how: `<p>En PyTorch, chaque tenseur garde un historique de toutes les opérations qui l'ont produit (le <strong>graphe de calcul</strong>). <code>detach()</code> supprime cet historique :</p><div class="fm"><span class="hg">x_detach</span> = [xi.<span class="hg">detach()</span> for xi in x]
 
 # x a un historique : x.grad_fn = BackwardConv2d(...)
 # x_detach n'en a pas : x_detach.grad_fn = <span class="ho">None</span>
@@ -331,13 +1139,15 @@ how:`<p>En PyTorch, chaque tenseur garde un historique de toutes les opérations
 # Conséquence lors du backward() :
 # L_o2o → one2one_cv2/cv3 → <span class="ho">STOP</span> (pas de backbone)
 # L_o2m → cv2/cv3 → Neck → Backbone → <span class="hg">OK</span></div><p>Les <strong>valeurs numériques</strong> de <code>x_detach</code> sont identiques à <code>x</code> — seul l'historique est effacé.</p>`,
-why:`<p><strong>Pourquoi est-ce la ligne la plus importante de YOLO26 ?</strong> Sans <code>detach()</code>, les deux têtes enverraient des gradients <strong>contradictoires</strong> au backbone :</p><ul><li>O2M veut activer <strong>10 ancres</strong> par objet → « étale le signal »</li><li>O2O veut n'en activer qu'<strong>une seule</strong> → « concentre le signal »</li></ul><p>Ces objectifs opposés rendraient le backbone <strong>instable et divergent</strong>. Avec <code>detach()</code>, le backbone n'est entraîné que par O2M (signal dense et stable), tandis que O2O apprend indépendamment sur ses propres poids.</p><p><strong>Pourquoi pas simplement désactiver les gradients de O2O ?</strong> Il faut que O2O apprenne quand même ! Ses propres couches (<code>one2one_cv2/cv3</code>) doivent être mises à jour. <code>detach()</code> coupe le flux uniquement vers le backbone, pas vers les couches de O2O.</p>`,
-ana:`<p>Imagine un <strong>professeur de musique (O2M)</strong> qui enseigne à un élève <strong>(O2O)</strong> en jouant du piano. L'élève écoute et répète, mais ses fausses notes ne changent pas la façon dont le professeur joue. <code>detach()</code> est le <strong>casque audio à sens unique</strong> : l'élève entend le professeur, mais le professeur n'entend pas l'élève.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li><code>detach()</code> copie les valeurs SANS l'historique de calcul</li><li>O2O peut apprendre (ses poids sont mis à jour) mais <strong>ne modifie pas le backbone</strong></li><li>Sans detach() → gradients contradictoires → <strong>divergence</strong></li><li>C'est <em>la ligne la plus importante</em> de tout le code YOLO26</li></ul></div>`},
+        why: `<p><strong>Pourquoi est-ce la ligne la plus importante de YOLO26 ?</strong> Sans <code>detach()</code>, les deux têtes enverraient des gradients <strong>contradictoires</strong> au backbone :</p><ul><li>O2M veut activer <strong>10 ancres</strong> par objet → « étale le signal »</li><li>O2O veut n'en activer qu'<strong>une seule</strong> → « concentre le signal »</li></ul><p>Ces objectifs opposés rendraient le backbone <strong>instable et divergent</strong>. Avec <code>detach()</code>, le backbone n'est entraîné que par O2M (signal dense et stable), tandis que O2O apprend indépendamment sur ses propres poids.</p><p><strong>Pourquoi pas simplement désactiver les gradients de O2O ?</strong> Il faut que O2O apprenne quand même ! Ses propres couches (<code>one2one_cv2/cv3</code>) doivent être mises à jour. <code>detach()</code> coupe le flux uniquement vers le backbone, pas vers les couches de O2O.</p>`,
+        ana: `<p>Imagine un <strong>professeur de musique (O2M)</strong> qui enseigne à un élève <strong>(O2O)</strong> en jouant du piano. L'élève écoute et répète, mais ses fausses notes ne changent pas la façon dont le professeur joue. <code>detach()</code> est le <strong>casque audio à sens unique</strong> : l'élève entend le professeur, mais le professeur n'entend pas l'élève.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li><code>detach()</code> copie les valeurs SANS l'historique de calcul</li><li>O2O peut apprendre (ses poids sont mis à jour) mais <strong>ne modifie pas le backbone</strong></li><li>Sans detach() → gradients contradictoires → <strong>divergence</strong></li><li>C'est <em>la ligne la plus importante</em> de tout le code YOLO26</li></ul></div>`
+      },
 
-{t:"Tête O2O (sans gradient)",ic:"🔷",s:"Étape 05 · Phase Forward",
-what:`<p>Apprendre à produire <strong>une seule boîte par objet</strong>. C'est l'<strong>« élève »</strong> du système — il observe les features du backbone (via <code>detach</code>) et apprend à sélectionner la meilleure prédiction. <strong>C'est cette tête qui sera conservée en production</strong> (la tête O2M sera supprimée).</p><p>Le nom « <strong>One-to-One</strong> » signifie qu'un objet est associé à <em>une seule</em> prédiction positive.</p>`,
-how:`<p>Architecture <strong>identique</strong> à O2M (mêmes couches) mais avec des <strong>poids indépendants</strong>, créés par copie profonde :</p><div class="fm">self.one2one_cv2 = copy.<span class="hp">deepcopy</span>(self.cv2)  # même architecture
+      {
+        t: "Tête O2O (sans gradient)", ic: "🔷", s: "Étape 05 · Phase Forward",
+        what: `<p>Apprendre à produire <strong>une seule boîte par objet</strong>. C'est l'<strong>« élève »</strong> du système — il observe les features du backbone (via <code>detach</code>) et apprend à sélectionner la meilleure prédiction. <strong>C'est cette tête qui sera conservée en production</strong> (la tête O2M sera supprimée).</p><p>Le nom « <strong>One-to-One</strong> » signifie qu'un objet est associé à <em>une seule</em> prédiction positive.</p>`,
+        how: `<p>Architecture <strong>identique</strong> à O2M (mêmes couches) mais avec des <strong>poids indépendants</strong>, créés par copie profonde :</p><div class="fm">self.one2one_cv2 = copy.<span class="hp">deepcopy</span>(self.cv2)  # même architecture
 self.one2one_cv3 = copy.<span class="hp">deepcopy</span>(self.cv3)  # poids indépendants
 
 preds_o2o = forward_head(<span class="hg">x_detach</span>,  # ← features DÉTACHÉES
@@ -347,25 +1157,58 @@ preds_o2o = forward_head(<span class="hg">x_detach</span>,  # ← features DÉTA
 # Pendant le backward :
 # Gradient met à jour <span class="hc">one2one_cv2/cv3</span> ← OUI
 # Gradient vers le backbone ← <span class="ho">NON</span> (detach)</div>`,
-why:`<p><strong>Pourquoi séparer O2M et O2O ?</strong> Elles ont le même réseau mais des objectifs incompatibles : O2M active 10 ancres/objet, O2O n'en active qu'une. Si elles partageaient les mêmes poids, elles ne pourraient pas apprendre des comportements différents.</p><p><strong>Pourquoi O2O est-elle « importante » ?</strong> C'est elle seule qui tourne en production. O2M n'est qu'un outil d'entraînement. O2O doit être capable de sélectionner <em>d'elle-même</em> la meilleure boîte sans post-traitement (NMS).</p><p><strong>Pourquoi <code>deepcopy</code> ?</strong> Pour avoir exactement la même architecture de couches (même nombre de paramètres, mêmes types de convolutions) mais avec des poids qui évolueront indépendamment.</p>`,
-ana:`<p>L'élève doit maintenant apprendre à <strong>jouer seul, sans filet de sécurité</strong>. Pendant l'entraînement, il observe le professeur (O2M) et s'exerce avec une seule fléchette. Le jour de l'examen (inférence), il sera seul sur scène — il doit viser juste du premier coup.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>O2O = One-to-One = <strong>1 ancre par objet</strong></li><li><strong>Seule tête conservée à l'inférence</strong> (O2M supprimée)</li><li>Poids indépendants via <code>deepcopy</code></li><li>Reçoit les features <strong>détachées</strong> → n'affecte pas le backbone</li></ul></div>`},
+        why: `<p><strong>Pourquoi séparer O2M et O2O ?</strong> Elles ont le même réseau mais des objectifs incompatibles : O2M active 10 ancres/objet, O2O n'en active qu'une. Si elles partageaient les mêmes poids, elles ne pourraient pas apprendre des comportements différents.</p><p><strong>Pourquoi O2O est-elle « importante » ?</strong> C'est elle seule qui tourne en production. O2M n'est qu'un outil d'entraînement. O2O doit être capable de sélectionner <em>d'elle-même</em> la meilleure boîte sans post-traitement (NMS).</p><p><strong>Pourquoi <code>deepcopy</code> ?</strong> Pour avoir exactement la même architecture de couches (même nombre de paramètres, mêmes types de convolutions) mais avec des poids qui évolueront indépendamment.</p>`,
+        ana: `<p>L'élève doit maintenant apprendre à <strong>jouer seul, sans filet de sécurité</strong>. Pendant l'entraînement, il observe le professeur (O2M) et s'exerce avec une seule fléchette. Le jour de l'examen (inférence), il sera seul sur scène — il doit viser juste du premier coup.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>O2O = One-to-One = <strong>1 ancre par objet</strong></li><li><strong>Seule tête conservée à l'inférence</strong> (O2M supprimée)</li><li>Poids indépendants via <code>deepcopy</code></li><li>Reçoit les features <strong>détachées</strong> → n'affecte pas le backbone</li></ul></div>`
+      },
 
-{t:"Pré-traitement annotations",ic:"📋",s:"Étape 06 · Phase Assignation",
-what:`<p>Convertir les annotations COCO brutes (boîtes et classes) en un format utilisable par les têtes de détection. Le réseau travaille avec des <strong>coordonnées relatives à chaque cellule de la grille</strong> — on doit transformer les boîtes pour qu'elles soient exprimées dans ce référentiel.</p>`,
-how:`<p>Le processus suit ces étapes :</p><ul><li><strong>Concaténation</strong> : regrouper <code>batch_idx + cls + bboxes</code> en un seul tenseur</li><li><strong>Conversion</strong> : format <code>[x,y,w,h]</code> → <code>[x1,y1,x2,y2]</code> (coins) et multiplication par 640</li><li><strong>Génération d'ancres</strong> : <code>make_anchors()</code> crée les 8400 points de la grille avec leurs strides</li><li><strong>Décodage</strong> : <code>dist2bbox</code> convertit les 4 distances prédites (l,t,r,b) en coordonnées de boîtes</li></ul><div class="fm"># <span class="ho">Particularité YOLO26</span> : reg_max=1 → PAS de DFL
+      {
+        t: "Pré-traitement annotations", ic: "📋", s: "Étape 06 · Phase Assignation",
+        what: `<p>Convertir les annotations COCO brutes (boîtes et classes) en un format utilisable par les têtes de détection. Le réseau travaille avec des <strong>coordonnées relatives à chaque cellule de la grille</strong> — on doit transformer les boîtes pour qu'elles soient exprimées dans ce référentiel.</p>`,
+        how: `<p>Le processus suit ces étapes :</p><ul><li><strong>Concaténation</strong> : regrouper <code>batch_idx + cls + bboxes</code> en un seul tenseur</li><li><strong>Conversion</strong> : format <code>[x,y,w,h]</code> → <code>[x1,y1,x2,y2]</code> (coins) et multiplication par 640</li><li><strong>Génération d'ancres</strong> : <code>make_anchors()</code> crée les 8400 points de la grille avec leurs strides</li><li><strong>Décodage</strong> : <code>dist2bbox</code> convertit les 4 distances prédites (l,t,r,b) en coordonnées de boîtes</li></ul><div class="fm"># <span class="ho">Particularité YOLO26</span> : reg_max=1 → PAS de DFL
 
 # DFL (Distribution Focal Loss) prédirait une distribution
 # softmax sur 16 bins pour chaque distance.
 # YOLO26 prédit directement <span class="hc">4 valeurs</span> (l,t,r,b)
 # → Plus simple, plus rapide, compatible NPU/DSP</div><p class="note"><strong>DFL</strong> = technique où le réseau prédit une distribution de probabilités sur 16 valeurs possibles pour chaque distance, puis calcule la moyenne pondérée. YOLO26 supprime cette complexité.</p>`,
-why:`<p><strong>Pourquoi cette transformation est nécessaire ?</strong> Les annotations COCO sont en coordonnées absolues de l'image, mais les têtes de détection travaillent en coordonnées relatives à la grille. C'est comme passer de coordonnées GPS à des adresses postales.</p><p><strong>Pourquoi supprimer la DFL ?</strong> La DFL utilise une opération <code>softmax</code> qui est difficile à exporter sur les processeurs spécialisés (NPU, DSP). En prédisant directement 4 distances, YOLO26 simplifie l'export ONNX/TensorRT et accélère l'inférence sur les appareils edge.</p>`,
-ana:`<p>C'est comme <strong>traduire des coordonnées GPS</strong> en adresses postales compréhensibles par le facteur local. Le réseau ne comprend que les « adresses de sa grille » — il faut reformater les annotations pour qu'il les comprenne.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Conversion : xywh → xyxy, normalisation × 640</li><li>8400 points d'ancrage générés (P3+P4+P5)</li><li><strong>YOLO26 : pas de DFL</strong> (reg_max=1) → régression directe</li><li>Export NPU/DSP simplifié (pas de softmax)</li></ul></div>`},
+        why: `<p><strong>Pourquoi cette transformation est nécessaire ?</strong> Les annotations COCO sont en coordonnées absolues de l'image, mais les têtes de détection travaillent en coordonnées relatives à la grille. C'est comme passer de coordonnées GPS à des adresses postales.</p><p><strong>Pourquoi supprimer la DFL ?</strong> La DFL utilise une opération <code>softmax</code> qui est difficile à exporter sur les processeurs spécialisés (NPU, DSP). En prédisant directement 4 distances, YOLO26 simplifie l'export ONNX/TensorRT et accélère l'inférence sur les appareils edge.</p>`,
+        ana: `<p>C'est comme <strong>traduire des coordonnées GPS</strong> en adresses postales compréhensibles par le facteur local. Le réseau ne comprend que les « adresses de sa grille » — il faut reformater les annotations pour qu'il les comprenne.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Conversion : xywh → xyxy, normalisation × 640</li><li>8400 points d'ancrage générés (P3+P4+P5)</li><li><strong>YOLO26 : pas de DFL</strong> (reg_max=1) → régression directe</li><li>Export NPU/DSP simplifié (pas de softmax)</li></ul></div>`
+      },
 
-{t:"TAL O2M (topk=10)",ic:"🎯",s:"Étape 07 · Phase Assignation",
-what:`<p>Le <strong>TAL</strong> (TaskAlignedAssigner) détermine <strong>quelles prédictions seront considérées comme positives</strong> pour chaque objet réel. Pour O2M, on sélectionne les <strong>10 meilleures</strong> par objet — c'est le signal dense qui entraîne le backbone.</p><p class="note"><strong>IoU</strong> (Intersection over Union) = mesure de chevauchement entre deux boîtes. IoU=1.0 = parfait, IoU=0 = aucun chevauchement.</p>`,
-how:`<p>L'algorithme suit 4 étapes :</p><ol><li><strong>Filtrage géométrique + STAL</strong> : on garde uniquement les ancres dont le centre est dans une boîte GT. Pour les objets < 8px, STAL élargit la boîte à 16px</li><li><strong>Métrique d'alignement</strong> : <code>M = score<sup>α</sup> × IoU<sup>β</sup></code> avec α=0.5, β=6.0</li><li><strong>Sélection top-10</strong> : on garde les 10 meilleures ancres par objet selon M</li><li><strong>Résolution des conflits</strong> : si une ancre est assignée à 2 objets → celui avec le meilleur IoU gagne</li></ol><div class="fm">M = score^<span class="ho">0.5</span> × IoU^<span class="hc">6.0</span>
+      {
+        t: "STAL — Small Target Alignment", ic: "🔬", s: "Étape 07 · Phase Assignation",
+        what: `<p><strong>STAL</strong> (Small Target Alignment Learning) est un mécanisme de <strong>protection des petits objets</strong> qui intervient dans le filtrage géométrique du TAL, juste avant de calculer la métrique d'alignement.</p><p>Son rôle : garantir que les objets <strong>plus petits que le stride minimal</strong> (< 8 pixels en largeur ou hauteur) reçoivent au moins une ancre candidate. Sans STAL, ces objets seraient purement et simplement <strong>invisibles</strong> au modèle pendant l'entraînement.</p><p class="note"><strong>Stride</strong> = facteur de réduction spatial. Le plus petit stride de YOLO26 est P3 (stride=8), ce qui signifie qu'un pixel de la feature map P3 correspond à une zone de 8×8 pixels dans l'image originale.</p>`,
+        how: `<p>L'algorithme STAL intervient dans la fonction <code>select_candidates_in_gts()</code> du TAL, <strong>avant</strong> le test d'inclusion des ancres :</p><div class="fm"># Étape 1 : Convertir les GT en format (x_centre, y_centre, w, h)
+<span class="hp">gt_xywh</span> = xyxy2xywh(gt_bboxes)
+
+# Étape 2 : Identifier les objets trop petits
+<span class="ho">wh_mask</span> = gt_xywh[..., 2:] < <span class="ho">stride[0]</span>  # stride[0] = 8px
+# → True si largeur OU hauteur < 8px
+
+# Étape 3 : Élargir virtuellement ces objets à <span class="hg">16px</span>
+gt_xywh[..., 2:] = torch.where(
+    <span class="ho">wh_mask</span>,
+    torch.tensor(<span class="hg">16.0</span>),   # nouvelle taille minimale
+    gt_xywh[..., 2:]        # inchangé si > 8px
+)
+
+# Étape 4 : Reconvertir en format xyxy pour le test d'inclusion
+<span class="hg">gt_bboxes_stal</span> = xywh2xyxy(gt_xywh)
+
+# Étape 5 : Test d'inclusion avec les boîtes ÉLARGIE
+deltas = cat(anc_points - lt, rb - anc_points)
+mask_in_gts = deltas.amin(-1).gt_(0)
+# → Au moins 1 ancre est maintenant DANS la boîte élargie</div><p><strong>Important :</strong> L'élargissement ne concerne que le <strong>masque de sélection des candidats</strong>. La perte (CIoU, BCE) est calculée sur les <strong>vraies dimensions GT</strong>, PAS sur les dimensions dilatées.</p>`,
+        why: `<p><strong>Pourquoi les petits objets sont-ils en danger ?</strong></p><p>Le TAL sélectionne les ancres candidates en vérifiant que le <strong>centre de l'ancre</strong> se trouve à l'intérieur de la boîte GT. Mais les centres d'ancrage sont espacés selon le stride (8px pour P3). Un objet de 5×5 pixels se retrouve dans un cas critique :</p><ul><li>La boîte GT couvre une zone de 5×5 pixels</li><li>Les centres d'ancrage P3 sont espacés de 8 pixels</li><li>Il y a une probabilité élevée qu'<strong>aucun centre d'ancre</strong> ne tombe dans cette zone de 5×5</li><li>Résultat : <strong>0 ancre candidate → 0 gradient → l'objet est invisible</strong></li></ul><p><strong>Pourquoi 16px et pas 8px ?</strong> Élargir à 16px (2× le stride de P3) garantit qu'au moins <strong>4 centres d'ancrage P3</strong> tombent dans la zone élargie, fournissant suffisamment de candidats pour le topk du TAL.</p><p><strong>Quand STAL est-il critique ?</strong></p><ul><li>Images de <strong>drones/satellites</strong> avec des piétons à très haute altitude (~3×7 pixels)</li><li>Imagerie <strong>médicale</strong> avec de petites lésions</li><li>Surveillance avec des objets <strong>lointains</strong> (véhicules à 500m+)</li></ul><p><strong>Impact quantitatif :</strong> Sans STAL, les benchmarks sur petits objets (APₛ dans COCO) perdent jusqu'à <strong>−1.5 à −2.0 points</strong>.</p>`,
+        ana: `<p>Imagine un professeur qui fait <strong>l'appel dans une salle de classe</strong>. Il repère les élèves en parcourant les rangées du regard (= ancres sur la grille). Si un élève est <strong>très petit et caché derrière un bureau</strong> (= objet < 8px), le professeur ne le voit pas et le marque absent.</p><p>STAL est comme une <strong>règle spéciale</strong> : pour les petits élèves, on leur demande de <strong>lever un drapeau de 16cm</strong> au-dessus de leur tête, ce qui les rend visibles au professeur. Le drapeau n'est utilisé que pour le repérage — pour la note (= le calcul de la perte), c'est bien la taille réelle de l'élève qui compte.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés — STAL</div><ul><li>Cible : objets dont la largeur OU hauteur est <strong>< 8 pixels</strong> (stride P3)</li><li>Action : élargit <strong>virtuellement</strong> la boîte GT à 16×16 px pour la sélection d'ancres</li><li>L'élargissement n'affecte <strong>PAS</strong> le calcul de la perte (CIoU, BCE)</li><li>Garantit au moins <strong>~4 centres d'ancrage P3</strong> comme candidats</li><li>Impact : <strong>+1.5 à +2.0 APₛ</strong> sur les petits objets (COCO)</li><li>Critique pour : drones, satellites, imagerie médicale, surveillance longue portée</li></ul></div>`
+      },
+
+      {
+        t: "TAL O2M (topk=10)", ic: "🎯", s: "Étape 08 · Phase Assignation",
+        what: `<p>Le <strong>TAL</strong> (TaskAlignedAssigner) détermine <strong>quelles prédictions seront considérées comme positives</strong> pour chaque objet réel. Pour O2M, on sélectionne les <strong>10 meilleures</strong> par objet — c'est le signal dense qui entraîne le backbone.</p><p class="note"><strong>IoU</strong> (Intersection over Union) = mesure de chevauchement entre deux boîtes. IoU=1.0 = parfait, IoU=0 = aucun chevauchement.</p>`,
+        how: `<p>L'algorithme suit 4 étapes :</p><ol><li><strong>Filtrage géométrique + STAL</strong> : on garde uniquement les ancres dont le centre est dans une boîte GT. Pour les objets < 8px, STAL élargit la boîte à 16px</li><li><strong>Métrique d'alignement</strong> : <code>M = score<sup>α</sup> × IoU<sup>β</sup></code> avec α=0.5, β=6.0</li><li><strong>Sélection top-10</strong> : on garde les 10 meilleures ancres par objet selon M</li><li><strong>Résolution des conflits</strong> : si une ancre est assignée à 2 objets → celui avec le meilleur IoU gagne</li></ol><div class="fm">M = score^<span class="ho">0.5</span> × IoU^<span class="hc">6.0</span>
 
 # Exemple concret :
 # Ancre A : score_cls=0.9, IoU=0.3
@@ -375,24 +1218,28 @@ how:`<p>L'algorithme suit 4 étapes :</p><ol><li><strong>Filtrage géométrique 
 #   → M = 0.71 × 0.262    = <span class="hg">0.186</span>   ← gagne !
 
 # β=6 >> α=0.5 → la <span class="hc">localisation prime</span> largement</div>`,
-why:`<p><strong>Pourquoi 10 ancres ?</strong> C'est un bon compromis : assez pour un signal dense (accélère l'apprentissage), pas trop pour éviter le bruit. C'est un hyperparamètre validé expérimentalement.</p><p><strong>Pourquoi β=6.0 >> α=0.5 ?</strong> La localisation est rendue <strong>12× plus importante</strong> que la classification. Pour un détecteur NMS-Free, il est crucial que l'ancre choisie soit la mieux <em>localisée</em>, pas simplement la plus confiante. Il n'y aura PAS de NMS pour corriger une mauvaise sélection après coup.</p><p><strong>Pourquoi STAL ?</strong> Un objet < 8 pixels (piéton vu d'un drone à très haute altitude) n'a aucun centre d'ancre dans sa boîte — il serait invisible. STAL élargit artificiellement ces boîtes à 16px pour la sélection (pas pour la perte).</p>`,
-ana:`<p>Pour un exercice de maths, le professeur <strong>note 10 réponses différentes</strong> de l'élève pour l'aider à comprendre où il se trompe. Les réponses proches de la bonne solution (bonne localisation) reçoivent les meilleures notes, même si le raisonnement (classification) est moyen.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>TAL = TaskAlignedAssigner, exécuté <code>@torch.no_grad()</code></li><li>Métrique : M = score^0.5 × IoU^<strong>6.0</strong> (localisation domine)</li><li>topk = <strong>10</strong> ancres positives par objet</li><li>STAL : élargit les objets < 8px à 16px pour garantir au moins 1 ancre</li></ul></div>`},
+        why: `<p><strong>Pourquoi 10 ancres ?</strong> C'est un bon compromis : assez pour un signal dense (accélère l'apprentissage), pas trop pour éviter le bruit. C'est un hyperparamètre validé expérimentalement.</p><p><strong>Pourquoi β=6.0 >> α=0.5 ?</strong> La localisation est rendue <strong>12× plus importante</strong> que la classification. Pour un détecteur NMS-Free, il est crucial que l'ancre choisie soit la mieux <em>localisée</em>, pas simplement la plus confiante. Il n'y aura PAS de NMS pour corriger une mauvaise sélection après coup.</p><p><strong>Pourquoi STAL ?</strong> Un objet < 8 pixels (piéton vu d'un drone à très haute altitude) n'a aucun centre d'ancre dans sa boîte — il serait invisible. STAL élargit artificiellement ces boîtes à 16px pour la sélection (pas pour la perte).</p>`,
+        ana: `<p>Pour un exercice de maths, le professeur <strong>note 10 réponses différentes</strong> de l'élève pour l'aider à comprendre où il se trompe. Les réponses proches de la bonne solution (bonne localisation) reçoivent les meilleures notes, même si le raisonnement (classification) est moyen.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>TAL = TaskAlignedAssigner, exécuté <code>@torch.no_grad()</code></li><li>Métrique : M = score^0.5 × IoU^<strong>6.0</strong> (localisation domine)</li><li>topk = <strong>10</strong> ancres positives par objet</li><li>STAL : élargit les objets < 8px à 16px pour garantir au moins 1 ancre</li></ul></div>`
+      },
 
-{t:"TAL O2O (topk2=1)",ic:"🎯",s:"Étape 08 · Phase Assignation",
-what:`<p>Assigner <strong>strictement une seule</strong> prédiction à chaque objet — c'est le <strong>cœur du mécanisme NMS-Free</strong>. En forçant exactement 1 ancre positive par objet pendant l'entraînement, le réseau apprend que chaque objet ne doit activer qu'<strong>un seul point</strong> de la grille.</p>`,
-how:`<p>Même métrique que O2M mais avec un <strong>double filtrage</strong> :</p><ul><li><strong>Étape 1 — topk=7</strong> : explorer d'abord 7 candidates par objet</li><li><strong>Étape 2 — Conflits</strong> : résolution bidirectionnelle (une ancre assignée à 2 objets → meilleur IoU gagne)</li><li><strong>Étape 3 — topk2=1</strong> : parmi les candidates restantes, ne garder que LA meilleure</li></ul><div class="fm"># Le mécanisme clé du NMS-Free :
+      {
+        t: "TAL O2O (topk2=1)", ic: "🎯", s: "Étape 09 · Phase Assignation",
+        what: `<p>Assigner <strong>strictement une seule</strong> prédiction à chaque objet — c'est le <strong>cœur du mécanisme NMS-Free</strong>. En forçant exactement 1 ancre positive par objet pendant l'entraînement, le réseau apprend que chaque objet ne doit activer qu'<strong>un seul point</strong> de la grille.</p>`,
+        how: `<p>Même métrique que O2M mais avec un <strong>double filtrage</strong> :</p><ul><li><strong>Étape 1 — topk=7</strong> : explorer d'abord 7 candidates par objet</li><li><strong>Étape 2 — Conflits</strong> : résolution bidirectionnelle (une ancre assignée à 2 objets → meilleur IoU gagne)</li><li><strong>Étape 3 — topk2=1</strong> : parmi les candidates restantes, ne garder que LA meilleure</li></ul><div class="fm"># Le mécanisme clé du NMS-Free :
 if self.topk2 != self.topk:  # O2O: topk=7, topk2=1 → True
     # Filtrer à topk2=<span class="hg">1</span> meilleure ancre par GT
     best_idx = torch.topk(align_metric, <span class="hg">self.topk2</span>).indices
     mask_pos *= scatter(best_idx)
     # Résultat : <span class="hc">1 SEULE ancre positive par objet</span></div>`,
-why:`<p><strong>⚡ C'est ICI que le NMS-Free se produit !</strong> Ce bloc <code>if self.topk2 != self.topk</code> est LE mécanisme qui rend YOLO26 NMS-Free.</p><p><strong>Pourquoi topk=7 puis topk2=1 (et pas directement topk=1) ?</strong> Si on mettait topk=1, le TAL choisirait la meilleure ancre sur une seule mesure. Avec topk=7, on explore d'abord 7 candidates, on résout les conflits multi-objets, PUIS on filtre à 1. La sélection est <strong>plus robuste et plus stable</strong>.</p><p><strong>Pourquoi la vérification bidirectionnelle ?</strong> Pour éviter les appariements incohérents — une prédiction pourrait mieux correspondre à un autre objet. La vérification dans les deux sens garantit la cohérence.</p>`,
-ana:`<p>L'élève n'a maintenant droit qu'à <strong>une seule fléchette</strong>. Il doit viser avec précision. Le professeur sélectionne d'abord 7 positions possibles, élimine les conflits, puis ne lui montre que <em>la meilleure façon de lancer</em>. Pas de seconde chance.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés — LE CŒUR DU NMS-FREE</div><ul><li>topk=7 → topk2=<strong>1</strong> = double filtrage</li><li>Exactement <strong>1 ancre positive par objet</strong></li><li>C'est CE mécanisme qui rend le NMS inutile</li><li>Les 8399 autres ancres apprennent à prédire un score <strong>faible</strong></li></ul></div>`},
-{t:"Pertes O2M",ic:"📉",s:"Étape 09 · Phase Pertes",
-what:`<p>Mesurer l'erreur entre ce que O2M a <strong>prédit</strong> et ce que l'objet est <strong>réellement</strong>. Cette erreur (appelée « perte » ou « loss ») est le signal qui dira au réseau comment s'améliorer. La perte est composée de <strong>3 termes</strong> :</p><ul><li><strong>BCE</strong> (Binary Cross-Entropy) : mesure l'erreur sur la classe prédite (ex: « est-ce un chien ou un chat ? »)</li><li><strong>CIoU</strong> (Complete IoU) : mesure l'écart entre la boîte prédite et la boîte réelle — inclut distance, taille ET proportions</li><li><strong>L1</strong> : mesure l'erreur sur les 4 distances (gauche, haut, droite, bas)</li></ul><p class="note"><strong>CIoU</strong> est plus précise que l'IoU simple car elle pénalise aussi les différences de forme (ratio d'aspect) et la distance entre les centres des boîtes.</p>`,
-how:`<div class="fm"><span class="ho">L_cls</span> = BCE(pred_scores, target_scores) # targets continus !
+        why: `<p><strong>⚡ C'est ICI que le NMS-Free se produit !</strong> Ce bloc <code>if self.topk2 != self.topk</code> est LE mécanisme qui rend YOLO26 NMS-Free.</p><p><strong>Pourquoi topk=7 puis topk2=1 (et pas directement topk=1) ?</strong> Si on mettait topk=1, le TAL choisirait la meilleure ancre sur une seule mesure. Avec topk=7, on explore d'abord 7 candidates, on résout les conflits multi-objets, PUIS on filtre à 1. La sélection est <strong>plus robuste et plus stable</strong>.</p><p><strong>Pourquoi la vérification bidirectionnelle ?</strong> Pour éviter les appariements incohérents — une prédiction pourrait mieux correspondre à un autre objet. La vérification dans les deux sens garantit la cohérence.</p>`,
+        ana: `<p>L'élève n'a maintenant droit qu'à <strong>une seule fléchette</strong>. Il doit viser avec précision. Le professeur sélectionne d'abord 7 positions possibles, élimine les conflits, puis ne lui montre que <em>la meilleure façon de lancer</em>. Pas de seconde chance.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés — LE CŒUR DU NMS-FREE</div><ul><li>topk=7 → topk2=<strong>1</strong> = double filtrage</li><li>Exactement <strong>1 ancre positive par objet</strong></li><li>C'est CE mécanisme qui rend le NMS inutile</li><li>Les 8399 autres ancres apprennent à prédire un score <strong>faible</strong></li></ul></div>`
+      },
+      {
+        t: "Pertes O2M", ic: "📉", s: "Étape 10 · Phase Pertes",
+        what: `<p>Mesurer l'erreur entre ce que O2M a <strong>prédit</strong> et ce que l'objet est <strong>réellement</strong>. Cette erreur (appelée « perte » ou « loss ») est le signal qui dira au réseau comment s'améliorer. La perte est composée de <strong>3 termes</strong> :</p><ul><li><strong>BCE</strong> (Binary Cross-Entropy) : mesure l'erreur sur la classe prédite (ex: « est-ce un chien ou un chat ? »)</li><li><strong>CIoU</strong> (Complete IoU) : mesure l'écart entre la boîte prédite et la boîte réelle — inclut distance, taille ET proportions</li><li><strong>L1</strong> : mesure l'erreur sur les 4 distances (gauche, haut, droite, bas)</li></ul><p class="note"><strong>CIoU</strong> est plus précise que l'IoU simple car elle pénalise aussi les différences de forme (ratio d'aspect) et la distance entre les centres des boîtes.</p>`,
+        how: `<div class="fm"><span class="ho">L_cls</span> = BCE(pred_scores, target_scores) # targets continus !
 <span class="ho">L_box</span> = (1 - CIoU(pred, gt)) × weight   # weight = 7.5
 <span class="ho">L_l1</span>  = |pred_ltrb - target_ltrb|       # distances absolues
 
@@ -400,13 +1247,15 @@ how:`<div class="fm"><span class="ho">L_cls</span> = BCE(pred_scores, target_sco
 
 # ⚡ Rétropropagé → cv2, cv3 → Neck → Backbone
 # = principal signal d'entraînement du modèle</div>`,
-why:`<p><strong>Pourquoi ces 3 termes et pas un seul ?</strong> Localiser et classifier sont deux objectifs distincts. Les combiner permet au modèle d'apprendre simultanément à bien placer la boîte ET à bien identifier l'objet.</p><p><strong>Pourquoi CIoU et pas IoU simple ?</strong> L'IoU simple ne pénalise pas deux boîtes qui ne se chevauchent pas du tout (IoU = 0 pour toutes). CIoU ajoute la distance entre centres et le ratio d'aspect → meilleure convergence.</p><p><strong>Pourquoi le poids 7.5 pour la localisation ?</strong> La localisation est rendue ~7.5× plus importante que la classification, car dans un détecteur NMS-Free, une boîte mal placée est irrattrapable (pas de NMS pour corriger).</p>`,
-ana:`<p>C'est comme <strong>noter un exercice de maths</strong> : la note de localisation (« où est la boîte ? ») compte pour ~60%, la note de classification (« quel objet ? ») pour ~40%. La combinaison donne une note globale qui guide l'apprentissage.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>3 pertes combinées : <strong>BCE</strong> (classification) + <strong>CIoU</strong> (localisation) + <strong>L1</strong> (distances)</li><li>Targets <strong>continus</strong> [0,1] — pas binaires (une ancre IoU=0.9 → target≈0.9)</li><li>CIoU > IoU simple : prend en compte distance des centres + ratio d'aspect</li><li>Ces gradients <strong>remontent au backbone</strong> via O2M</li></ul></div>`},
+        why: `<p><strong>Pourquoi ces 3 termes et pas un seul ?</strong> Localiser et classifier sont deux objectifs distincts. Les combiner permet au modèle d'apprendre simultanément à bien placer la boîte ET à bien identifier l'objet.</p><p><strong>Pourquoi CIoU et pas IoU simple ?</strong> L'IoU simple ne pénalise pas deux boîtes qui ne se chevauchent pas du tout (IoU = 0 pour toutes). CIoU ajoute la distance entre centres et le ratio d'aspect → meilleure convergence.</p><p><strong>Pourquoi le poids 7.5 pour la localisation ?</strong> La localisation est rendue ~7.5× plus importante que la classification, car dans un détecteur NMS-Free, une boîte mal placée est irrattrapable (pas de NMS pour corriger).</p>`,
+        ana: `<p>C'est comme <strong>noter un exercice de maths</strong> : la note de localisation (« où est la boîte ? ») compte pour ~60%, la note de classification (« quel objet ? ») pour ~40%. La combinaison donne une note globale qui guide l'apprentissage.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>3 pertes combinées : <strong>BCE</strong> (classification) + <strong>CIoU</strong> (localisation) + <strong>L1</strong> (distances)</li><li>Targets <strong>continus</strong> [0,1] — pas binaires (une ancre IoU=0.9 → target≈0.9)</li><li>CIoU > IoU simple : prend en compte distance des centres + ratio d'aspect</li><li>Ces gradients <strong>remontent au backbone</strong> via O2M</li></ul></div>`
+      },
 
-{t:"Pertes O2O",ic:"📉",s:"Étape 10 · Phase Pertes",
-what:`<p>Mesurer l'erreur de la tête O2O, avec la <strong>même structure</strong> que les pertes O2M, mais appliquée à <strong>1 seule ancre par objet</strong>. Le but est de guider O2O pour qu'elle apprenne à sélectionner la meilleure boîte parmi les 8400.</p><p class="note"><strong>BCE</strong> (Binary Cross-Entropy) = fonction qui mesure l'écart entre une probabilité prédite et la valeur cible. Plus l'écart est grand, plus la perte est élevée.</p>`,
-how:`<p>Les mêmes 3 composantes que O2M :</p><div class="fm"><span class="hc">L_cls</span> = BCE(pred_scores_o2o, target_scores_o2o)
+      {
+        t: "Pertes O2O", ic: "📉", s: "Étape 11 · Phase Pertes",
+        what: `<p>Mesurer l'erreur de la tête O2O, avec la <strong>même structure</strong> que les pertes O2M, mais appliquée à <strong>1 seule ancre par objet</strong>. Le but est de guider O2O pour qu'elle apprenne à sélectionner la meilleure boîte parmi les 8400.</p><p class="note"><strong>BCE</strong> (Binary Cross-Entropy) = fonction qui mesure l'écart entre une probabilité prédite et la valeur cible. Plus l'écart est grand, plus la perte est élevée.</p>`,
+        how: `<p>Les mêmes 3 composantes que O2M :</p><div class="fm"><span class="hc">L_cls</span> = BCE(pred_scores_o2o, target_scores_o2o)
 <span class="hc">L_box</span> = (1 - CIoU(pred_box_o2o, gt_box))
 <span class="hc">L_l1</span> = |pred_ltrb_o2o - target_ltrb|
 
@@ -415,13 +1264,15 @@ how:`<p>Les mêmes 3 composantes que O2M :</p><div class="fm"><span class="hc">L
 # Pendant le backward() :
 # Gradient → one2one_cv2, one2one_cv3 ← <span class="hc">MIS À JOUR</span>
 # Gradient → Backbone ← <span class="ho">BLOQUÉ par detach()</span></div>`,
-why:`<p><strong>Pourquoi la même structure de perte ?</strong> O2O doit apprendre exactement les mêmes tâches que O2M (localiser + classifier), mais avec une contrainte plus stricte : 1 seule ancre. La même structure permet une comparaison directe et facilite la transition ProgLoss.</p><p><strong>Pourquoi les gradients ne remontent pas au backbone ?</strong> Grâce au <code>detach()</code> de l'étape 4, les features envoyées à O2O n'ont pas d'historique. Seuls les poids propres de O2O (<code>one2one_cv2/cv3</code>) sont modifiés.</p>`,
-ana:`<p>L'élève (O2O) fait le <strong>même examen que le professeur</strong> (O2M), mais avec une seule fléchette au lieu de 10. Sa note est calculée de la même manière, mais ses erreurs ne modifient pas la méthode d'enseignement du professeur — elles ne corrigent que <em>son propre geste</em>.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Même structure que O2M : CIoU + BCE + L1</li><li>Appliquée à <strong>1 seule ancre/objet</strong> (vs 10 pour O2M)</li><li>Met à jour uniquement <code>one2one_cv2/cv3</code></li><li>Le backbone n'est <strong>PAS affecté</strong> (detach)</li></ul></div>`},
+        why: `<p><strong>Pourquoi la même structure de perte ?</strong> O2O doit apprendre exactement les mêmes tâches que O2M (localiser + classifier), mais avec une contrainte plus stricte : 1 seule ancre. La même structure permet une comparaison directe et facilite la transition ProgLoss.</p><p><strong>Pourquoi les gradients ne remontent pas au backbone ?</strong> Grâce au <code>detach()</code> de l'étape 4, les features envoyées à O2O n'ont pas d'historique. Seuls les poids propres de O2O (<code>one2one_cv2/cv3</code>) sont modifiés.</p>`,
+        ana: `<p>L'élève (O2O) fait le <strong>même examen que le professeur</strong> (O2M), mais avec une seule fléchette au lieu de 10. Sa note est calculée de la même manière, mais ses erreurs ne modifient pas la méthode d'enseignement du professeur — elles ne corrigent que <em>son propre geste</em>.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Même structure que O2M : CIoU + BCE + L1</li><li>Appliquée à <strong>1 seule ancre/objet</strong> (vs 10 pour O2M)</li><li>Met à jour uniquement <code>one2one_cv2/cv3</code></li><li>Le backbone n'est <strong>PAS affecté</strong> (detach)</li></ul></div>`
+      },
 
-{t:"ProgLoss",ic:"⚖️",s:"Étape 11 · Phase Pertes",
-what:`<p>Ajuster <strong>progressivement</strong> l'importance relative des deux têtes au fil de l'entraînement. Au début, O2M domine (signal dense pour apprendre les features). À la fin, O2O domine (préparation pour l'inférence sans NMS).</p><p>L'époque 42/500 est un exemple de point intermédiaire : w_o2m ≈ 0.74, w_o2o ≈ 0.26.</p>`,
-how:`<p>La perte totale est une <strong>somme pondérée</strong> dont les poids changent à chaque époque :</p><div class="fm"><span class="ho">w_o2m(t)</span> = max(1 − t/(epochs−1), 0) × (0.8 − 0.1) + 0.1
+      {
+        t: "ProgLoss", ic: "⚖️", s: "Étape 12 · Phase Pertes",
+        what: `<p>Ajuster <strong>progressivement</strong> l'importance relative des deux têtes au fil de l'entraînement. Au début, O2M domine (signal dense pour apprendre les features). À la fin, O2O domine (préparation pour l'inférence sans NMS).</p><p>L'époque 42/500 est un exemple de point intermédiaire : w_o2m ≈ 0.74, w_o2o ≈ 0.26.</p>`,
+        how: `<p>La perte totale est une <strong>somme pondérée</strong> dont les poids changent à chaque époque :</p><div class="fm"><span class="ho">w_o2m(t)</span> = max(1 − t/(epochs−1), 0) × (0.8 − 0.1) + 0.1
 <span class="hc">w_o2o(t)</span> = 1.0 − w_o2m(t)
 
 <span class="hg">L_total</span> = <span class="ho">w_o2m</span> × L_o2m + <span class="hc">w_o2o</span> × L_o2o
@@ -431,13 +1282,15 @@ how:`<p>La perte totale est une <strong>somme pondérée</strong> dont les poids
 # Ép. 42  : w_o2m=<span class="ho">0.74</span>, w_o2o=0.26 → début transition
 # Ép. 250 : w_o2m=0.45, w_o2o=<span class="hc">0.55</span> → croisement
 # Ép. 499 : w_o2m=0.10, w_o2o=<span class="hc">0.90</span> → O2O domine</div>`,
-why:`<p><strong>Pourquoi une transition progressive et pas brutale ?</strong> Si on basculait instantanément de O2M à O2O, le modèle pourrait diverger — comme passer brutalement de la natation avec bouée à la nage en pleine mer. La transition lente permet au modèle de s'adapter progressivement.</p><p><strong>Pourquoi commencer à 80/20 ?</strong> Les premières époques sont cruciales : le backbone ne sait rien, il a besoin du signal dense de O2M (10 ancres/objet) pour apprendre rapidement les features de base.</p><p><strong>Pourquoi finir à 10/90 et pas 0/100 ?</strong> Garder O2M à 10% (pas 0%) fournit une légère régularisation — comme des petites roues qu'on laisse très légèrement en contact avec le sol pour la stabilité.</p>`,
-ana:`<p>C'est comme <strong>apprendre à faire du vélo</strong> : au début, on utilise des petites roues (O2M = 80%) qui stabilisent l'enfant. Progressivement, on les relève de plus en plus. À la fin, l'enfant roule presque seul (O2O = 90%), avec les petites roues qui frôlent à peine le sol (O2M = 10%).</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Décroissance <strong>linéaire</strong> : w_o2m de 0.80 → 0.10</li><li>w_o2o = 1 − w_o2m (somme toujours = 1)</li><li>Point de croisement ≈ époque 250/500</li><li>Sans ProgLoss : −0.3 à −0.5% mAP</li></ul></div>`},
+        why: `<p><strong>Pourquoi une transition progressive et pas brutale ?</strong> Si on basculait instantanément de O2M à O2O, le modèle pourrait diverger — comme passer brutalement de la natation avec bouée à la nage en pleine mer. La transition lente permet au modèle de s'adapter progressivement.</p><p><strong>Pourquoi commencer à 80/20 ?</strong> Les premières époques sont cruciales : le backbone ne sait rien, il a besoin du signal dense de O2M (10 ancres/objet) pour apprendre rapidement les features de base.</p><p><strong>Pourquoi finir à 10/90 et pas 0/100 ?</strong> Garder O2M à 10% (pas 0%) fournit une légère régularisation — comme des petites roues qu'on laisse très légèrement en contact avec le sol pour la stabilité.</p>`,
+        ana: `<p>C'est comme <strong>apprendre à faire du vélo</strong> : au début, on utilise des petites roues (O2M = 80%) qui stabilisent l'enfant. Progressivement, on les relève de plus en plus. À la fin, l'enfant roule presque seul (O2O = 90%), avec les petites roues qui frôlent à peine le sol (O2M = 10%).</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Décroissance <strong>linéaire</strong> : w_o2m de 0.80 → 0.10</li><li>w_o2o = 1 − w_o2m (somme toujours = 1)</li><li>Point de croisement ≈ époque 250/500</li><li>Sans ProgLoss : −0.3 à −0.5% mAP</li></ul></div>`
+      },
 
-{t:"Backpropagation",ic:"🔙",s:"Étape 12 · Phase Optimisation",
-what:`<p>Calculer les <strong>gradients</strong> (directions de correction) pour tous les paramètres entraînables du modèle. C'est le cœur de l'apprentissage : les gradients indiquent <em>comment</em> et <em>de combien</em> ajuster chaque poids pour réduire l'erreur.</p><p class="note"><strong>Gradient</strong> = dérivée partielle de la perte par rapport à un poids. Un gradient positif signifie « diminuer ce poids », un gradient négatif signifie « augmenter ce poids ».</p>`,
-how:`<p>PyTorch utilise la <strong>différentiation automatique</strong> (autograd) : il parcourt le graphe de calcul en sens inverse (de la perte vers les entrées) en appliquant la <strong>règle de la chaîne</strong> :</p><div class="fm"><span class="ho">L_o2m</span> → cv2, cv3 → Neck → Backbone
+      {
+        t: "Backpropagation", ic: "🔙", s: "Étape 13 · Phase Optimisation",
+        what: `<p>Calculer les <strong>gradients</strong> (directions de correction) pour tous les paramètres entraînables du modèle. C'est le cœur de l'apprentissage : les gradients indiquent <em>comment</em> et <em>de combien</em> ajuster chaque poids pour réduire l'erreur.</p><p class="note"><strong>Gradient</strong> = dérivée partielle de la perte par rapport à un poids. Un gradient positif signifie « diminuer ce poids », un gradient négatif signifie « augmenter ce poids ».</p>`,
+        how: `<p>PyTorch utilise la <strong>différentiation automatique</strong> (autograd) : il parcourt le graphe de calcul en sens inverse (de la perte vers les entrées) en appliquant la <strong>règle de la chaîne</strong> :</p><div class="fm"><span class="ho">L_o2m</span> → cv2, cv3 → Neck → Backbone
        ↑ <span class="hg">GRADIENT COMPLET</span> (tout est connecté)
 
 <span class="hc">L_o2o</span> → one2one_cv2, one2one_cv3 → <span class="ho">STOP</span>
@@ -446,13 +1299,15 @@ how:`<p>PyTorch utilise la <strong>différentiation automatique</strong> (autogr
 # En une ligne :
 loss_total.backward()  # PyTorch calcule ∂L/∂w
                        # pour CHAQUE poids w connecté</div><p>Le résultat : chaque paramètre entraînable a un attribut <code>.grad</code> contenant la direction de correction à appliquer.</p>`,
-why:`<p><strong>Pourquoi est-ce nécessaire ?</strong> Sans backpropagation, impossible de savoir comment corriger les poids — le réseau ne pourrait pas apprendre. C'est comme un sportif qui lance mais ne regarde jamais où la balle atterrit.</p><p><strong>Pourquoi le detach affecte la backprop ?</strong> Le graphe de calcul est comme un arbre : <code>detach()</code> coupe une branche. Les gradients ne peuvent pas traverser une branche coupée — ils s'arrêtent aux couches de O2O et ne remontent pas au backbone.</p>`,
-ana:`<p>C'est comme un <strong>sportif qui analyse au ralenti la trajectoire de sa balle</strong> après un lancer : il décompose chaque mouvement (épaule, coude, poignet, doigts) pour comprendre lequel a causé l'erreur. La backprop fait la même chose en remontant chaque opération mathématique.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Utilise la <strong>règle de la chaîne</strong> (calcul automatique PyTorch)</li><li>O2M → backbone : gradient <strong>complet</strong></li><li>O2O → backbone : gradient <strong>bloqué</strong> (detach)</li><li>Résultat : chaque poids a un <code>.grad</code> qui indique la correction</li></ul></div>`},
+        why: `<p><strong>Pourquoi est-ce nécessaire ?</strong> Sans backpropagation, impossible de savoir comment corriger les poids — le réseau ne pourrait pas apprendre. C'est comme un sportif qui lance mais ne regarde jamais où la balle atterrit.</p><p><strong>Pourquoi le detach affecte la backprop ?</strong> Le graphe de calcul est comme un arbre : <code>detach()</code> coupe une branche. Les gradients ne peuvent pas traverser une branche coupée — ils s'arrêtent aux couches de O2O et ne remontent pas au backbone.</p>`,
+        ana: `<p>C'est comme un <strong>sportif qui analyse au ralenti la trajectoire de sa balle</strong> après un lancer : il décompose chaque mouvement (épaule, coude, poignet, doigts) pour comprendre lequel a causé l'erreur. La backprop fait la même chose en remontant chaque opération mathématique.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Utilise la <strong>règle de la chaîne</strong> (calcul automatique PyTorch)</li><li>O2M → backbone : gradient <strong>complet</strong></li><li>O2O → backbone : gradient <strong>bloqué</strong> (detach)</li><li>Résultat : chaque poids a un <code>.grad</code> qui indique la correction</li></ul></div>`
+      },
 
-{t:"MuSGD",ic:"⚡",s:"Étape 13 · Phase Optimisation",
-what:`<p>Utiliser les gradients calculés pour <strong>mettre à jour concrètement les poids</strong> du modèle. MuSGD est une variante de SGD (Stochastic Gradient Descent) avec <strong>momentum</strong> et une <strong>correction de courbure</strong> inspirée de l'optimiseur Muon des grands modèles de langage.</p><p class="note"><strong>Momentum</strong> = technique qui accumule une « vitesse » au fil des itérations, permettant de traverser les zones plates et d'accélérer la convergence.</p>`,
-how:`<p>L'algorithme maintient une <strong>vitesse v</strong> qui s'accumule :</p><div class="fm"># À chaque itération :
+      {
+        t: "MuSGD", ic: "⚡", s: "Étape 14 · Phase Optimisation",
+        what: `<p>Utiliser les gradients calculés pour <strong>mettre à jour concrètement les poids</strong> du modèle. MuSGD est une variante de SGD (Stochastic Gradient Descent) avec <strong>momentum</strong> et une <strong>correction de courbure</strong> inspirée de l'optimiseur Muon des grands modèles de langage.</p><p class="note"><strong>Momentum</strong> = technique qui accumule une « vitesse » au fil des itérations, permettant de traverser les zones plates et d'accélérer la convergence.</p>`,
+        how: `<p>L'algorithme maintient une <strong>vitesse v</strong> qui s'accumule :</p><div class="fm"># À chaque itération :
 <span class="hp">v</span> = μ · v − η · ∇L    # μ=0.937 (inertie), η=learning rate
 <span class="hc">w</span> = w + v            # mise à jour des poids
 
@@ -464,13 +1319,15 @@ how:`<p>L'algorithme maintient une <strong>vitesse v</strong> qui s'accumule :</
 # Stratégie différenciée :
 # Backbone → SGD + <span class="hg">correction Muon</span> (stabilisation)
 # Têtes    → SGD standard (apprentissage rapide)</div>`,
-why:`<p><strong>Pourquoi MuSGD plutôt que SGD simple ?</strong> Le momentum (μ=0.937) agit comme un volant d'inertie : il lisse les oscillations et accélère dans les directions cohérentes. Crucial pour l'entraînement dual-head qui est plus instable.</p><p><strong>Pourquoi pas Adam ?</strong> Adam est plus adaptatif mais peut diverger avec les architectures dual-head. SGD + momentum donne souvent de meilleures performances finales en généralisation. La correction Muon compense sa convergence plus lente.</p><p><strong>Pourquoi un traitement différent backbone/têtes ?</strong> Le backbone est le composant le plus sensible (partagé par les deux têtes) — il bénéficie de la stabilisation Muon. Les têtes, plus petites et indépendantes, peuvent apprendre rapidement avec un SGD standard.</p>`,
-ana:`<p>C'est comme un <strong>patineur qui utilise son élan</strong> (momentum) pour aller plus vite et plus droit, au lieu de repartir de zéro à chaque pas. L'élan lisse les petites irrégularités de la glace et permet de garder une trajectoire stable.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>SGD + momentum (μ=0.937) + correction Muon</li><li>Learning rate : warmup 3 époques → cosine decay</li><li>Backbone : SGD + Muon (stabilité) · Têtes : SGD standard</li><li>Weight decay = 5e-4 (évite le surapprentissage)</li></ul></div>`},
+        why: `<p><strong>Pourquoi MuSGD plutôt que SGD simple ?</strong> Le momentum (μ=0.937) agit comme un volant d'inertie : il lisse les oscillations et accélère dans les directions cohérentes. Crucial pour l'entraînement dual-head qui est plus instable.</p><p><strong>Pourquoi pas Adam ?</strong> Adam est plus adaptatif mais peut diverger avec les architectures dual-head. SGD + momentum donne souvent de meilleures performances finales en généralisation. La correction Muon compense sa convergence plus lente.</p><p><strong>Pourquoi un traitement différent backbone/têtes ?</strong> Le backbone est le composant le plus sensible (partagé par les deux têtes) — il bénéficie de la stabilisation Muon. Les têtes, plus petites et indépendantes, peuvent apprendre rapidement avec un SGD standard.</p>`,
+        ana: `<p>C'est comme un <strong>patineur qui utilise son élan</strong> (momentum) pour aller plus vite et plus droit, au lieu de repartir de zéro à chaque pas. L'élan lisse les petites irrégularités de la glace et permet de garder une trajectoire stable.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>SGD + momentum (μ=0.937) + correction Muon</li><li>Learning rate : warmup 3 époques → cosine decay</li><li>Backbone : SGD + Muon (stabilité) · Têtes : SGD standard</li><li>Weight decay = 5e-4 (évite le surapprentissage)</li></ul></div>`
+      },
 
-{t:"Fin d'époque",ic:"🔄",s:"Étape 14 · Phase Optimisation",
-what:`<p>À la fin de chaque époque (= un passage complet sur toutes les images d'entraînement), on <strong>ajuste les poids de ProgLoss</strong> pour l'époque suivante. C'est le « coup de thermostat » qui fait évoluer progressivement le compromis O2M ↔ O2O.</p>`,
-how:`<p>Le trainer appelle la fonction <code>decay()</code> qui recalcule les coefficients :</p><div class="fm"># À la fin de chaque époque :
+      {
+        t: "Fin d'époque", ic: "🔄", s: "Étape 15 · Phase Optimisation",
+        what: `<p>À la fin de chaque époque (= un passage complet sur toutes les images d'entraînement), on <strong>ajuste les poids de ProgLoss</strong> pour l'époque suivante. C'est le « coup de thermostat » qui fait évoluer progressivement le compromis O2M ↔ O2O.</p>`,
+        how: `<p>Le trainer appelle la fonction <code>decay()</code> qui recalcule les coefficients :</p><div class="fm"># À la fin de chaque époque :
 self.epoch += 1
 
 # Recalcul des poids ProgLoss
@@ -482,13 +1339,15 @@ progress = self.epoch / (self.epochs - 1)
 # progress = 42/499 = 0.084
 # o2m = max(1-0.084, 0) × 0.7 + 0.1 = <span class="ho">0.741</span>
 # o2o = 1 - 0.741 = <span class="hc">0.259</span></div>`,
-why:`<p><strong>Pourquoi cette mise à jour est nécessaire ?</strong> Sans elle, les poids resteraient fixes à 80/20 pendant tout l'entraînement — le modèle ne s'adapterait jamais à l'inférence O2O seule. C'est le mécanisme qui orchestre toute la transition.</p><p><strong>Pourquoi à la fin de l'époque et pas à chaque batch ?</strong> Les poids de ProgLoss évoluent lentement (500 étapes pour 500 époques). Changer à chaque batch serait trop agressif et instable.</p>`,
-ana:`<p>C'est comme <strong>régler un thermostat progressivement</strong> : on ne passe pas de 30°C à 15°C d'un coup. On baisse de 1°C chaque jour pour permettre au corps de s'adapter sans choc thermique. ProgLoss fait la même chose avec le compromis O2M/O2O.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Fonction <code>decay()</code> appelée par le trainer à chaque époque</li><li>Décroissance linéaire de w_o2m : 0.80 → 0.10</li><li>w_o2o = 1 − w_o2m (augmente mécaniquement)</li><li>Orchestre la transition entraînement → inférence</li></ul></div>`},
+        why: `<p><strong>Pourquoi cette mise à jour est nécessaire ?</strong> Sans elle, les poids resteraient fixes à 80/20 pendant tout l'entraînement — le modèle ne s'adapterait jamais à l'inférence O2O seule. C'est le mécanisme qui orchestre toute la transition.</p><p><strong>Pourquoi à la fin de l'époque et pas à chaque batch ?</strong> Les poids de ProgLoss évoluent lentement (500 étapes pour 500 époques). Changer à chaque batch serait trop agressif et instable.</p>`,
+        ana: `<p>C'est comme <strong>régler un thermostat progressivement</strong> : on ne passe pas de 30°C à 15°C d'un coup. On baisse de 1°C chaque jour pour permettre au corps de s'adapter sans choc thermique. ProgLoss fait la même chose avec le compromis O2M/O2O.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés</div><ul><li>Fonction <code>decay()</code> appelée par le trainer à chaque époque</li><li>Décroissance linéaire de w_o2m : 0.80 → 0.10</li><li>w_o2o = 1 − w_o2m (augmente mécaniquement)</li><li>Orchestre la transition entraînement → inférence</li></ul></div>`
+      },
 
-{t:"Inférence",ic:"🚀",s:"Étape 15 · Post-entraînement",
-what:`<p>Le résultat final de tout ce pipeline : un modèle qui produit <strong>directement une seule boîte par objet</strong>, sans aucun post-traitement NMS. On supprime la tête O2M (devenue inutile), on conserve le backbone + la tête O2O. La sortie est un tenseur <code>[1, 300, 6]</code> (max 300 détections, chacune avec 4 coordonnées + score + classe).</p>`,
-how:`<div class="fm"># 1. Suppression définitive de O2M
+      {
+        t: "Inférence", ic: "🚀", s: "Étape 16 · Post-entraînement",
+        what: `<p>Le résultat final de tout ce pipeline : un modèle qui produit <strong>directement une seule boîte par objet</strong>, sans aucun post-traitement NMS. On supprime la tête O2M (devenue inutile), on conserve le backbone + la tête O2O. La sortie est un tenseur <code>[1, 300, 6]</code> (max 300 détections, chacune avec 4 coordonnées + score + classe).</p>`,
+        how: `<div class="fm"># 1. Suppression définitive de O2M
 self.cv2 = self.cv3 = <span class="ho">None</span>  # fuse()  → libère la mémoire
 
 # 2. Forward inférence (O2O seule)
@@ -506,16 +1365,17 @@ y = self.postprocess(y)  # top-300 par score, <span class="hg">PAS de NMS</span>
 # qu'UNE SEULE ancre par objet. Les 8399 autres
 # ont été entraînées à produire un score FAIBLE.
 # Le top-300 ≈ ~1 prédiction/objet, ZÉRO doublon.</div>`,
-why:`<p><strong>Pourquoi 300 détections max ?</strong> Le dataset COCO a en moyenne ~7 objets par image. 300 est un maximum très confortable même pour les scènes les plus denses, tout en gardant un tenseur de taille fixe (important pour l'export).</p><p><strong>Pourquoi c'est plus rapide ?</strong> Le NMS classique a une complexité O(n²) — il compare chaque boîte avec toutes les autres. Sur un GPU T4, ça prend ~4ms. Sans NMS, la latence est <strong>constante O(1)</strong> : un simple tri + seuil.</p><p><strong>Résultats réels (modèle nano, COCO) :</strong></p><ul><li>YOLOv8n : 37.3% mAP, ~80ms CPU → avec NMS</li><li>YOLO11n : 39.5% mAP, ~56ms CPU → avec NMS</li><li><strong>YOLO26n : 40.9% mAP, ~39ms CPU → SANS NMS ✓</strong></li></ul>`,
-ana:`<p>Après tout l'entraînement, l'élève <strong>sait désormais viser juste du premier coup</strong>, sans avoir besoin d'un filet de sécurité (NMS). Il entre sur scène seul, lance une seule fléchette par cible, et touche à chaque fois. Le professeur (O2M) peut partir — sa mission est accomplie.</p>`,
-key:`<div class="keybox"><div class="keybox-title">📌 Points clés — RÉSULTAT FINAL</div><ul><li>Seule la tête <strong>O2O est conservée</strong> (O2M supprimée)</li><li>Sortie : [1, 300, 6] — tenseur de taille fixe</li><li><strong>Aucune NMS</strong> — latence constante O(1)</li><li>YOLO26n : <strong>40.9% mAP</strong>, 39ms CPU (−30% vs YOLO11)</li><li>Export ONNX/TensorRT natif — graphe pur, pas d'opération dynamique</li></ul></div>`}
-];
+        why: `<p><strong>Pourquoi 300 détections max ?</strong> Le dataset COCO a en moyenne ~7 objets par image. 300 est un maximum très confortable même pour les scènes les plus denses, tout en gardant un tenseur de taille fixe (important pour l'export).</p><p><strong>Pourquoi c'est plus rapide ?</strong> Le NMS classique a une complexité O(n²) — il compare chaque boîte avec toutes les autres. Sur un GPU T4, ça prend ~4ms. Sans NMS, la latence est <strong>constante O(1)</strong> : un simple tri + seuil.</p><p><strong>Résultats réels (modèle nano, COCO) :</strong></p><ul><li>YOLOv8n : 37.3% mAP, ~80ms CPU → avec NMS</li><li>YOLO11n : 39.5% mAP, ~56ms CPU → avec NMS</li><li><strong>YOLO26n : 40.9% mAP, ~39ms CPU → SANS NMS ✓</strong></li></ul>`,
+        ana: `<p>Après tout l'entraînement, l'élève <strong>sait désormais viser juste du premier coup</strong>, sans avoir besoin d'un filet de sécurité (NMS). Il entre sur scène seul, lance une seule fléchette par cible, et touche à chaque fois. Le professeur (O2M) peut partir — sa mission est accomplie.</p>`,
+        key: `<div class="keybox"><div class="keybox-title">📌 Points clés — RÉSULTAT FINAL</div><ul><li>Seule la tête <strong>O2O est conservée</strong> (O2M supprimée)</li><li>Sortie : [1, 300, 6] — tenseur de taille fixe</li><li><strong>Aucune NMS</strong> — latence constante O(1)</li><li>YOLO26n : <strong>40.9% mAP</strong>, 39ms CPU (−30% vs YOLO11)</li><li>Export ONNX/TensorRT natif — graphe pur, pas d'opération dynamique</li></ul></div>`
+      }
+    ];
 
-let cur=-1;const nodes=document.querySelectorAll('.node');
-function openModal(i){
-  cur=i;const d=D[i];
-  nodes.forEach(n=>n.classList.remove('active'));nodes[i]?.classList.add('active');
-  document.getElementById('modal').innerHTML=`
+    let cur = -1; const nodes = document.querySelectorAll('.node');
+    function openModal(i) {
+      cur = i; const d = D[i];
+      nodes.forEach(n => n.classList.remove('active')); nodes[i]?.classList.add('active');
+      document.getElementById('modal').innerHTML = `
     <button class="modal-close" onclick="closeModal()">✕</button>
     <div class="m-header"><span class="m-icon">${d.ic}</span><div><div class="m-title">${d.t}</div><div class="m-step">${d.s}</div></div></div>
     <div class="qa q-what"><div class="qa-label">🔷 À QUOI ÇA SERT ?</div>${d.what}</div>
@@ -524,23 +1384,24 @@ function openModal(i){
     <div class="qa q-ana"><div class="qa-label">💡 ANALOGIE</div>${d.ana}</div>
     ${d.key ? `<div class="qa q-key">${d.key}</div>` : ''}
     <div class="modal-nav">
-      <button onclick="openModal(${i-1})" ${i===0?'disabled':''}>← Précédent</button>
-      <span style="color:var(--text3);font-size:.7rem;font-family:'JetBrains Mono',monospace">${i+1} / ${D.length}</span>
-      <button onclick="openModal(${i+1})" ${i===D.length-1?'disabled':''}>Suivant →</button>
+      <button onclick="openModal(${i - 1})" ${i === 0 ? 'disabled' : ''}>← Précédent</button>
+      <span style="color:var(--text3);font-size:.7rem;font-family:'JetBrains Mono',monospace">${i + 1} / ${D.length}</span>
+      <button onclick="openModal(${i + 1})" ${i === D.length - 1 ? 'disabled' : ''}>Suivant →</button>
     </div>`;
-  document.getElementById('overlay').classList.add('show');
-  document.body.style.overflow='hidden';
-}
-function closeModal(){
-  document.getElementById('overlay').classList.remove('show');
-  document.body.style.overflow='';
-  nodes.forEach(n=>n.classList.remove('active'));cur=-1;
-}
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape')closeModal();
-  if(cur>=0&&e.key==='ArrowRight')openModal(Math.min(cur+1,D.length-1));
-  if(cur>=0&&e.key==='ArrowLeft')openModal(Math.max(cur-1,0));
-});
-</script>
+      document.getElementById('overlay').classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+      document.getElementById('overlay').classList.remove('show');
+      document.body.style.overflow = '';
+      nodes.forEach(n => n.classList.remove('active')); cur = -1;
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+      if (cur >= 0 && e.key === 'ArrowRight') openModal(Math.min(cur + 1, D.length - 1));
+      if (cur >= 0 && e.key === 'ArrowLeft') openModal(Math.max(cur - 1, 0));
+    });
+  </script>
 </body>
+
 </html>
